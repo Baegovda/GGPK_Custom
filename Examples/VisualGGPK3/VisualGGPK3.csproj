@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<EmbeddedResource Include="Resources/dir.ico" />
+		<EmbeddedResource Include="Resources/file.ico" />
+		<ProjectReference Include="../../LibBundledGGPK3/LibBundledGGPK3.csproj" />
+		<PackageReference Include="NAudio" Version="*" />
+		<PackageReference Include="NAudio.Vorbis" Version="*" />
+		<PackageReference Include="Pfim" Version="*" />
+		<PackageReference Include="LibVLCSharp" Version="*" />
+		<PackageReference Include="LibVLCSharp.Eto" Version="*" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+		<PackageReference Include="VideoLAN.LibVLC.Windows" Version="*" />
+	</ItemGroup>
+	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+		<PackageReference Include="VideoLAN.LibVLC.Linux" Version="*" />
+	</ItemGroup>
+	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+		<PackageReference Include="VideoLAN.LibVLC.Mac" Version="*" />
+	</ItemGroup>
+
+	<Import Project="../EtoForms.props" />
+
+</Project>

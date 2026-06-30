@@ -1,0 +1,45 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "VisualGGPK3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "prelaunch VisualGGPK3",
+			"program": "${workspaceFolder}/bin/Debug/VisualGGPK3.dll",
+			"cwd": "${workspaceFolder}/bin/Debug",
+			"console": "internalConsole",
+			"stopAtEntry": false
+		},
+		{
+			"name": "VPatchGGPK3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build solution",
+			"program": "${workspaceFolder}/bin/Debug/VPatchGGPK3.dll",
+			"cwd": "${workspaceFolder}/bin/Debug",
+			"console": "internalConsole",
+			"stopAtEntry": false
+		},
+		{
+			"name": "PoeChinese3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build solution",
+			"program": "${workspaceFolder}/bin/Debug/PoeChinese3.dll",
+			"cwd": "${workspaceFolder}/bin/Debug",
+			"console": "integratedTerminal",
+			"stopAtEntry": false
+		},
+		{
+			"name": "ExtractBundledGGPK3",
+			"type": "coreclr",
+			"request": "launch",
+			"preLaunchTask": "build solution",
+			"program": "${workspaceFolder}/bin/Debug/ExtractBundledGGPK3.dll",
+			"cwd": "${workspaceFolder}/bin/Debug",
+			"console": "integratedTerminal",
+			"stopAtEntry": false
+		}
+	]
+}

@@ -1,0 +1,41 @@
+---
+description: VisualGGPK3 변경 후 빌드·버전·인수인계 워크플로
+globs: Examples/VisualGGPK3/**,build-run.ps1,Run-VisualGGPK3.cmd,VISUALGGPK3-HANDOFF.md,Directory.Build.props,.github/Version.txt
+alwaysApply: false
+---
+
+VisualGGPK3 관련 작업을 마친 뒤에는 **반드시** 아래를 따른다.
+
+## 1. 인수인계 문서 (단일 소스)
+
+모든 맥락·버전 규칙·changelog는 **오직 이 파일 하나**에 기록한다:
+
+- `VISUALGGPK3-HANDOFF.md` (레포 루트)
+
+새 에이전트는 작업 전 이 파일을 읽는다. 별도 changelog/README 분산 금지.
+
+## 2. 버전 올리기 (패치마다)
+
+사용자에게 보이는 변경이 있으면 **항상** 소폭 버전업한다.
+
+| 변경 규모 | 예시 |
+|-----------|------|
+| PATCH +0.0.1 | 버그 수정, UI 소수정, 작은 기능 1개 |
+| MINOR +0.1.0 | 눈에 띄는 기능 묶음 (미리보기·필터 등) |
+
+갱신 위치:
+
+1. `Directory.Build.props` → `<Version>`
+2. `.github/Version.txt` → 맨 위에 새 버전 한 줄
+3. `VISUALGGPK3-HANDOFF.md` → 버전 이력 + changelog
+
+과도한 점프(예: 2.8 → 3.0)는 사용자 지시 없이 하지 않는다.
+
+## 3. 빌드 · 실행
+
+```powershell
+powershell -ExecutionPolicy Bypass -NoProfile -File build-run.ps1
+```
+
+- 종료 중인 `VisualGGPK3.exe` → Debug 빌드 → 실행
+- 빌드만: `dotnet build LibGGPK3.sln -c Debug`

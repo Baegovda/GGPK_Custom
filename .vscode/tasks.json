@@ -1,0 +1,67 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "stop VisualGGPK3",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy", "Bypass", "-NoProfile", "-Command",
+				"$p = Get-Process -Name VisualGGPK3 -ErrorAction SilentlyContinue; if ($p) { $p | Stop-Process -Force -ErrorAction SilentlyContinue }; exit 0"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "build solution",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder}/LibGGPK3.sln",
+				"-c",
+				"Debug",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary;ForceNoAlign"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "prelaunch VisualGGPK3",
+			"dependsOn": [
+				"stop VisualGGPK3",
+				"build solution"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": []
+		},
+		{
+			"label": "build and run VisualGGPK3",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy", "Bypass",
+				"-NoProfile",
+				"-File", "${workspaceFolder}/build-run.ps1"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "setup",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy", "Bypass",
+				"-File", "${workspaceFolder}/setup.ps1"
+			],
+			"problemMatcher": []
+		}
+	]
+}
