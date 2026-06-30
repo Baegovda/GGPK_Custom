@@ -15,11 +15,10 @@ internal static class TreeRefresh {
 #pragma warning restore CS0618
 		var multiSelected = TreeMultiSelection.Get(tree)?.Selected.ToArray();
 
-		InvalidateFilterCacheDeep(root);
 		CollapseEmptyExpanded(root);
 
 		Application.Instance.AsyncInvoke(() => {
-			RefreshInitializedBranches(tree, root);
+			RefreshExpandedDirectories(tree, root);
 #pragma warning disable CS0618
 			if (selected is not null)
 				tree.SelectedItem = selected;
@@ -29,18 +28,6 @@ internal static class TreeRefresh {
 			else
 				TreeMultiSelection.Get(tree)?.RefreshVisuals();
 		});
-	}
-
-	private static void RefreshInitializedBranches(TreeView tree, DirectoryTreeItem dir) {
-#pragma warning disable CS0618
-		tree.RefreshItem(dir);
-#pragma warning restore CS0618
-		if (!dir.Initialized)
-			return;
-		foreach (var child in dir.ChildItems) {
-			if (child is DirectoryTreeItem sub)
-				RefreshInitializedBranches(tree, sub);
-		}
 	}
 
 	public static void RefreshExpandedDirectories(TreeView tree, DirectoryTreeItem dir) {
@@ -63,22 +50,14 @@ internal static class TreeRefresh {
 #pragma warning restore CS0618
 	}
 
-	private static void InvalidateFilterCacheDeep(DirectoryTreeItem dir) {
-		dir.InvalidateFilterCache();
-		if (!dir.Initialized)
-			return;
-		foreach (var child in dir.EnumerateAllChildren()) {
-			if (child is DirectoryTreeItem sub)
-				InvalidateFilterCacheDeep(sub);
-		}
-	}
-
 	private static void CollapseEmptyExpanded(DirectoryTreeItem dir) {
 		if (!dir.Initialized)
 			return;
-		foreach (var child in dir.EnumerateAllChildren()) {
-			if (child is DirectoryTreeItem sub)
-				CollapseEmptyExpanded(sub);
+		if (dir.Expanded) {
+			foreach (var child in dir.ChildItems) {
+				if (child is DirectoryTreeItem sub)
+					CollapseEmptyExpanded(sub);
+			}
 		}
 		dir.CollapseIfEmptyFiltered();
 	}

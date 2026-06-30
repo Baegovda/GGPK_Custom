@@ -1,0 +1,56 @@
+---
+description: GitHub Release — 최신 1개만 공개, 이전 릴리스는 draft(비공개) 강제
+alwaysApply: true
+---
+
+# GitHub Release — 최신만 공개 (강제)
+
+에이전트가 **릴리스를 올릴 때마다** 이전 공개 릴리스가 쌓이지 않게 한다.  
+**방문자에게 보이는 Release는 항상 최신 버전 1개뿐.**
+
+## 정책
+
+| 대상 | 처리 |
+|------|------|
+| **최신** `vX.Y.Z` (방금 올린 버전) | **공개** (`draft=false`) |
+| **그 이전** 모든 semver 릴리스 | **draft** (= 비공개, 협력자만 보임) |
+
+공개 저장소에서는 릴리스를 완전 삭제하지 않고 **draft 전환**으로 비공개 처리한다.  
+`CHANGELOG.md`에는 전 버전 이력을 그대로 둔다 (문서용).
+
+## Publish 후 필수 (자동)
+
+`scripts/Publish-GitHubRelease.ps1` 실행 시 **마지막에 반드시** `Hide-OldGitHubReleases.ps1`가 돈다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/Publish-GitHubRelease.ps1 -Package
+```
+
+**`-Package` 없이 Publish만 하지 말 것** — 앱 Update zip까지 포함.
+
+`Hide-OldGitHubReleases.ps1`를 Publish 없이 단독 실행해서 정리할 때:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/Hide-OldGitHubReleases.ps1
+# 최신 태그 지정: -KeepTag v2.9.35
+# 미리보기: -WhatIf
+```
+
+## 에이전트 자기 점검 (릴리스 턴)
+
+- [ ] `Publish-GitHubRelease.ps1 -Package` 실행했는가?
+- [ ] 출력에 `Drafted (hidden): v...` (이전 버전들) 또는 `Latest public release: v...` 가 있는가?
+- [ ] 최신 태그에 `Published (public):` 또는 신규 create 후 draft 처리가 됐는가?
+- [ ] **이전 릴리스를 공개(`draft=false`)로 되돌리지 않았는가?**
+
+## 금지
+
+- 이전 버전 릴리스를 의도적으로 **공개 유지**
+- `Hide-OldGitHubReleases.ps1` 호출 생략
+- Releases 탭에 PATCH마다 공개 릴리스가 늘어나게 두기
+
+## 관련 파일
+
+- `scripts/Publish-GitHubRelease.ps1` — 릴리스 생성·업로드 후 hide 호출
+- `scripts/Hide-OldGitHubReleases.ps1` — 최신 외 draft 전환
+- `version-bump-mandatory.mdc` — 버전업·push·Publish 순서

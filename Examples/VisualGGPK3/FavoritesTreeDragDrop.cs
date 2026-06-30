@@ -110,13 +110,7 @@ internal static class FavoritesTreeDragDrop {
 		_ => null
 	};
 
-	private static ITreeItem? GetItemAt(System.Windows.Controls.TreeView tree, System.Windows.Point pos) {
-		var dep = tree.InputHitTest(pos) as System.Windows.DependencyObject;
-		while (dep is not null && dep is not System.Windows.Controls.TreeViewItem)
-			dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
-		if (dep is not System.Windows.Controls.TreeViewItem tvi)
-			return null;
-		return tvi.DataContext as ITreeItem ?? tvi.Header as ITreeItem;
-	}
+	private static ITreeItem? GetItemAt(System.Windows.Controls.TreeView tree, System.Windows.Point pos) =>
+		TreeItemHitTest.GetSelectableItemAt(tree, pos);
 }
 #endif

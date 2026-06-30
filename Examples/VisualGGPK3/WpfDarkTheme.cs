@@ -265,39 +265,37 @@ internal static class WpfDarkTheme {
 			      <RowDefinition Height='Auto'/>
 			      <RowDefinition/>
 			    </Grid.RowDefinitions>
-			    <Border x:Name='ItemBg' Grid.Row='0' Grid.ColumnSpan='2'
-			            Background='{TemplateBinding Background}'
-			            BorderBrush='{TemplateBinding BorderBrush}'
-			            BorderThickness='{TemplateBinding BorderThickness}'
-			            CornerRadius='3' Padding='1,1,4,1' SnapsToDevicePixels='True'>
-			      <Grid>
-			        <Grid.ColumnDefinitions>
-			          <ColumnDefinition Width='Auto'/>
-			          <ColumnDefinition Width='*'/>
-			        </Grid.ColumnDefinitions>
-			    <ToggleButton x:Name='Expander' Grid.Column='0'
-			                  Width='16' Height='16' Margin='0,0,2,0' Padding='0'
-			                  ClickMode='Press' Focusable='False'
-			                  Background='Transparent' BorderThickness='0'
-			                  IsChecked='{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}'>
-			      <ToggleButton.Style>
-			        <Style TargetType='ToggleButton'>
-			          <Setter Property='Visibility' Value='Collapsed'/>
-			          <Style.Triggers>
-			            <DataTrigger Binding='{Binding HasItems, RelativeSource={RelativeSource AncestorType=TreeViewItem}}' Value='True'>
-			              <Setter Property='Visibility' Value='Visible'/>
-			            </DataTrigger>
-			          </Style.Triggers>
-			        </Style>
-			      </ToggleButton.Style>
-			      <Path x:Name='Chevron' Data='M 2 1 L 6 5 L 2 9' Stroke='#a8a8b8' StrokeThickness='1.4'
-			            HorizontalAlignment='Center' VerticalAlignment='Center'/>
-			    </ToggleButton>
-			    <ContentPresenter x:Name='PART_Header' Grid.Column='1'
-			                      ContentSource='Header' VerticalAlignment='Center'
-			                      TextElement.Foreground='{TemplateBinding Foreground}'/>
-			      </Grid>
-			    </Border>
+			    <StackPanel Grid.Row='0' Orientation='Horizontal' HorizontalAlignment='Left'>
+			      <ToggleButton x:Name='Expander'
+			                    Width='16' Height='16' Margin='0,0,2,0' Padding='0'
+			                    ClickMode='Press' Focusable='False'
+			                    Background='Transparent' BorderThickness='0'
+			                    IsChecked='{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}'>
+			        <ToggleButton.Style>
+			          <Style TargetType='ToggleButton'>
+			            <Setter Property='Visibility' Value='Collapsed'/>
+			            <Style.Triggers>
+			              <DataTrigger Binding='{Binding HasItems, RelativeSource={RelativeSource AncestorType=TreeViewItem}}' Value='True'>
+			                <Setter Property='Visibility' Value='Visible'/>
+			              </DataTrigger>
+			            </Style.Triggers>
+			          </Style>
+			        </ToggleButton.Style>
+			        <Path x:Name='Chevron' Data='M 2 1 L 6 5 L 2 9' Stroke='#a8a8b8' StrokeThickness='1.4'
+			              HorizontalAlignment='Center' VerticalAlignment='Center'/>
+			      </ToggleButton>
+			      <Border x:Name='LeafIndent' Width='18' Visibility='Collapsed'
+			              Background='Transparent' IsHitTestVisible='False'/>
+			      <Border x:Name='ItemBg'
+			              Background='{TemplateBinding Background}'
+			              BorderBrush='{TemplateBinding BorderBrush}'
+			              BorderThickness='{TemplateBinding BorderThickness}'
+			              CornerRadius='3' Padding='1,1,4,1' SnapsToDevicePixels='True'>
+			        <ContentPresenter x:Name='PART_Header'
+			                          ContentSource='Header' VerticalAlignment='Center'
+			                          TextElement.Foreground='{TemplateBinding Foreground}'/>
+			      </Border>
+			    </StackPanel>
 			    <ItemsPresenter x:Name='ItemsHost' Grid.Row='1' Grid.Column='0' Grid.ColumnSpan='2'
 			                    Margin='16,0,0,0'/>
 			  </Grid>
@@ -306,7 +304,7 @@ internal static class WpfDarkTheme {
 			      <Setter TargetName='ItemsHost' Property='Visibility' Value='Collapsed'/>
 			    </Trigger>
 			    <Trigger Property='HasItems' Value='False'>
-			      <Setter TargetName='PART_Header' Property='Margin' Value='18,0,0,0'/>
+			      <Setter TargetName='LeafIndent' Property='Visibility' Value='Visible'/>
 			    </Trigger>
 			  </ControlTemplate.Triggers>
 			</ControlTemplate>

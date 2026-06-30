@@ -27,6 +27,8 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 
 	protected internal IReadOnlyList<ITreeItem>? _ChildItems;
 	protected internal int _filterVersion = -1;
+	private int _visibleUnderFilterVersion = -1;
+	private bool _visibleUnderFilter;
 
 	public override IReadOnlyList<ITreeItem> ChildItems {
 		get {
@@ -69,11 +71,18 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 	internal bool HasFilteredVisibleChild() {
 		if (!TreeViewFilter.IsActive)
 			return Children.Count > 0;
+		if (_visibleUnderFilterVersion == TreeViewFilter.Version)
+			return _visibleUnderFilter;
+		var visible = false;
 		foreach (var node in Children) {
-			if (node is ITreeItem item && FilterItem(item))
-				return true;
+			if (node is ITreeItem item && FilterItem(item)) {
+				visible = true;
+				break;
+			}
 		}
-		return false;
+		_visibleUnderFilterVersion = TreeViewFilter.Version;
+		_visibleUnderFilter = visible;
+		return visible;
 	}
 
 	internal bool HasMatchingDescendant() => HasFilteredVisibleChild();
@@ -144,6 +153,7 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 	protected internal override void InvalidateFilterCache() {
 		_ChildItems = null;
 		_filterVersion = -1;
+		_visibleUnderFilterVersion = -1;
 	}
 
 	public override int Extract(string path) { // TODO: Progress

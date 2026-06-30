@@ -145,6 +145,9 @@ internal sealed class TreeMultiSelection {
 		if (e.ChangedButton != System.Windows.Input.MouseButton.Left)
 			return;
 
+		if (TreeItemHitTest.IsExpanderHit(e.OriginalSource as System.Windows.DependencyObject))
+			return;
+
 		FinishMarqueeSelection();
 
 		dragStartPoint = e.GetPosition(wpfTree);
@@ -152,7 +155,7 @@ internal sealed class TreeMultiSelection {
 		marqueePending = false;
 		marqueeActive = false;
 
-		var item = GetItemAt(wpfTree, dragStartPoint);
+		var item = TreeItemHitTest.GetSelectableItemAt(wpfTree, dragStartPoint);
 		var mods = System.Windows.Input.Keyboard.Modifiers;
 		var ctrl = mods.HasFlag(System.Windows.Input.ModifierKeys.Control);
 		var shift = mods.HasFlag(System.Windows.Input.ModifierKeys.Shift);
@@ -214,7 +217,7 @@ internal sealed class TreeMultiSelection {
 			dragSelectActive = true;
 		}
 
-		var current = GetItemAt(wpfTree, pos);
+		var current = TreeItemHitTest.GetSelectableItemAt(wpfTree, pos);
 		if (current is null)
 			return;
 
@@ -343,37 +346,16 @@ internal sealed class TreeMultiSelection {
 		foreach (var tvi in EnumerateTreeViewItems(wpfTree)) {
 			if (!tvi.IsVisible || tvi.ActualHeight <= 0)
 				continue;
-			var item = GetTreeItem(tvi);
+			var item = TreeItemHitTest.GetTreeItem(tvi);
 			if (item is null)
 				continue;
-			var bounds = GetTreeViewItemBounds(tvi);
+			var bounds = TreeItemHitTest.GetLabelBounds(tvi, wpfTree);
 			if (bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
 				continue;
 			if (rect.IntersectsWith(bounds))
 				hits.Add(item);
 		}
 		return hits;
-	}
-
-	private static System.Windows.Rect GetTreeViewItemBounds(System.Windows.Controls.TreeViewItem tvi) {
-		try {
-			var root = FindRootTreeView(tvi);
-			if (root is null)
-				return System.Windows.Rect.Empty;
-			var transform = tvi.TransformToAncestor(root);
-			return transform.TransformBounds(new System.Windows.Rect(0, 0, tvi.ActualWidth, tvi.ActualHeight));
-		} catch {
-			return System.Windows.Rect.Empty;
-		}
-	}
-
-	private static System.Windows.Controls.TreeView? FindRootTreeView(System.Windows.DependencyObject node) {
-		while (node is not null) {
-			if (node is System.Windows.Controls.TreeView tree)
-				return tree;
-			node = System.Windows.Media.VisualTreeHelper.GetParent(node);
-		}
-		return null;
 	}
 
 	private static System.Windows.Rect CreateRect(System.Windows.Point a, System.Windows.Point b) {
@@ -427,27 +409,9 @@ internal sealed class TreeMultiSelection {
 		ApplyVisuals();
 	}
 
-	private static ITreeItem? GetItemAt(System.Windows.Controls.TreeView tree, System.Windows.Point pos) {
-		var dep = tree.InputHitTest(pos) as System.Windows.DependencyObject;
-		while (dep is not null && dep is not System.Windows.Controls.TreeViewItem)
-			dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
-		return dep is System.Windows.Controls.TreeViewItem tvi ? GetTreeItem(tvi) : null;
-	}
-
-	private static ITreeItem? GetTreeItem(System.Windows.Controls.TreeViewItem container) {
-		if (container.Header is ITreeItem headerItem)
-			return headerItem;
-		if (container.DataContext is ITreeItem dataItem)
-			return dataItem;
-		var nodeProp = container.DataContext?.GetType().GetProperty("Node");
-		if (nodeProp?.GetValue(container.DataContext) is ITreeItem nodeItem)
-			return nodeItem;
-		return null;
-	}
-
 	private void ApplyVisuals() {
 		foreach (var tvi in EnumerateTreeViewItems(wpfTree)) {
-			var item = GetTreeItem(tvi);
+			var item = TreeItemHitTest.GetTreeItem(tvi);
 			if (item is null)
 				continue;
 

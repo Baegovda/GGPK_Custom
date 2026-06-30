@@ -31,7 +31,8 @@ public static class TreeViewFilter {
 		MatchesPath(file.GetPath());
 
 	public static bool MatchesPath(string path) {
-		path = FavoritePaths.Normalize(path);
+		if (path.IndexOf('\\') >= 0)
+			path = path.Replace('\\', '/');
 		if (revealPath is not null && PathMatchesReveal(path, revealPath))
 			return true;
 		return FileFormatFilter.Matches(Path.GetFileName(path), path)

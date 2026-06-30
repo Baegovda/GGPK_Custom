@@ -36,9 +36,11 @@ powershell -ExecutionPolicy Bypass -File scripts/Publish-GitHubRelease.ps1 -Pack
 
 - `CHANGELOG.md`의 `## [버전]` 본문 → GitHub Release 노트
 - `git tag vX.Y.Z` + `gh release create` + `git push origin vX.Y.Z`
+- **`Hide-OldGitHubReleases.ps1`** — 최신 릴리스만 공개, 이전 버전은 **draft(비공개)**  
+  → 상세: `github-release-latest-only.mdc`
 
 **GitHub 저장소:** https://github.com/Baegovda/GGPK_Custom  
-**Releases 탭** = 공개 변경 이력. README 상단 CHANGELOG 링크와 동기화 유지.
+**Releases 탭 (공개)** = **최신 1개만**. 전체 이력은 `CHANGELOG.md`.
 
 ## 버전 규칙
 
@@ -61,3 +63,4 @@ powershell -ExecutionPolicy Bypass -File scripts/Publish-GitHubRelease.ps1 -Pack
 - [ ] Version 4곳 일치? (props, Version.txt, handoff, CHANGELOG 제목)
 - [ ] CHANGELOG에 새 `## [X.Y.Z]` 있음?
 - [ ] push 후 Release 스크립트 **-Package** 실행 완료?
+- [ ] 이전 릴리스 **draft(비공개)** 처리됐는가? (`github-release-latest-only.mdc`)

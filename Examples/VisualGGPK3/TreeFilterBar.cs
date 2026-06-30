@@ -28,6 +28,8 @@ internal sealed class TreeFilterBar : Panel {
 	private string selectedTypeKey = "";
 	private CancellationTokenSource? debounce;
 	private bool suppressEvents;
+	private string lastPersistedType = "\0";
+	private string lastPersistedExclude = "\0";
 
 	public event EventHandler? FiltersChanged;
 	public event EventHandler? ExportFilteredPngsRequested;
@@ -160,7 +162,7 @@ internal sealed class TreeFilterBar : Panel {
 		debounce = new CancellationTokenSource();
 		var token = debounce.Token;
 		try {
-			await Task.Delay(300, token);
+			await Task.Delay(100, token);
 			if (!token.IsCancellationRequested)
 				ApplyFilters();
 		} catch (TaskCanceledException) {
@@ -215,6 +217,8 @@ internal sealed class TreeFilterBar : Panel {
 		suppressEvents = true;
 		selectedTypeKey = IsValidTypeKey(saved.FilterType) ? saved.FilterType : "";
 		excludeBox.Text = saved.FilterExclude;
+		lastPersistedType = selectedTypeKey;
+		lastPersistedExclude = saved.FilterExclude.Trim();
 		suppressEvents = false;
 		UpdateTypeChipStyles();
 		SyncFilters();
@@ -234,12 +238,17 @@ internal sealed class TreeFilterBar : Panel {
 	}
 
 	private void PersistFilters() {
+		var exclude = excludeBox.Text.Trim();
+		if (selectedTypeKey == lastPersistedType && exclude == lastPersistedExclude)
+			return;
+		lastPersistedType = selectedTypeKey;
+		lastPersistedExclude = exclude;
 		var layout = LayoutSettingsStore.Load();
 		LayoutSettingsStore.Save(new LayoutSettingsStore.Layout(
 			layout.MainSplitter,
 			layout.InnerSplitter,
 			layout.InfoAutoHide,
 			selectedTypeKey,
-			excludeBox.Text.Trim()));
+			exclude));
 	}
 }

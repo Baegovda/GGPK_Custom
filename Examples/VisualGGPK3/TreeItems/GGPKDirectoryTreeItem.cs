@@ -25,6 +25,8 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 
 	protected internal ReadOnlyCollection<ITreeItem>? _ChildItems;
 	protected internal int _filterVersion = -1;
+	private int _visibleUnderFilterVersion = -1;
+	private bool _visibleUnderFilter;
 	private List<ITreeItem>? _allChildren;
 
 	public override ReadOnlyCollection<ITreeItem> ChildItems {
@@ -64,11 +66,18 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 	internal bool HasFilteredVisibleChild() {
 		if (!TreeViewFilter.IsActive)
 			return GetAllChildren().Count > 0;
+		if (_visibleUnderFilterVersion == TreeViewFilter.Version)
+			return _visibleUnderFilter;
+		var visible = false;
 		foreach (var child in GetAllChildren()) {
-			if (FilterItem(child))
-				return true;
+			if (FilterItem(child)) {
+				visible = true;
+				break;
+			}
 		}
-		return false;
+		_visibleUnderFilterVersion = TreeViewFilter.Version;
+		_visibleUnderFilter = visible;
+		return visible;
 	}
 
 	internal bool HasMatchingDescendant() => HasFilteredVisibleChild();
@@ -138,6 +147,7 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 	protected internal override void InvalidateFilterCache() {
 		_ChildItems = null;
 		_filterVersion = -1;
+		_visibleUnderFilterVersion = -1;
 	}
 
 	public override int Extract(string path) {

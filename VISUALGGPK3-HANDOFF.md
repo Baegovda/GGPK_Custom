@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.9.33` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.33)` |
+| **솔루션 / 어셈블리** | `2.9.35` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.35)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -33,9 +33,10 @@
    - 이 파일 → [버전 이력](#버전-이력) + changelog 항목
    - **`CHANGELOG.md`** → `## [X.Y.Z]` 섹션 (GitHub 공개용, handoff와 동기화)
    - `README.md` — 배지·기능 표 (필요 시)
-4. **GitHub Release** — push 후 `scripts/Publish-GitHubRelease.ps1` 실행  
-   → `vX.Y.Z` 태그 + [Releases](https://github.com/Baegovda/GGPK_Custom/releases)에 CHANGELOG 본문 게시  
-   → 인앱 업데이트용 zip: `Publish-GitHubRelease.ps1 -Package` (또는 `Package-VisualGGPK3Release.ps1` 후 `gh release upload`)
+4. **GitHub Release** — push 후 `scripts/Publish-GitHubRelease.ps1 -Package` 실행  
+   → `vX.Y.Z` 태그 + CHANGELOG 본문 게시  
+   → **`Hide-OldGitHubReleases.ps1`** 자동 호출 — **최신 1개만 공개**, 이전은 draft(비공개)  
+   → 인앱 업데이트 zip: `-Package`로 `VisualGGPK3-win-x64.zip` 업로드
 5. **changelog 형식** — 버전별로:
    - 한 줄 요약
    - bullet으로 사용자 관점 변경점
@@ -53,6 +54,17 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.35 (2026-06-30) — 트리 선택 히트 영역
+
+- 파일명(아이콘+텍스트) `ItemBg` 영역만 클릭·드래그 선택·하이라이트
+- 행 오른쪽 빈 공간 클릭 시 선택 해제, 확장 chevron은 선택 없이 펼치기만
+
+### 2.9.34 (2026-06-30) — 제외(Hide) 필터 속도
+
+- `HasFilteredVisibleChild` 필터 버전별 메모이제이션 — 중복 하위 트리 순회 제거
+- 필터 변경 시 전체 트리 `InvalidateFilterCacheDeep` 제거, 펼쳐진 가지만 갱신·접기
+- Hide/Show 입력 디바운스 300ms → 100ms, 설정 저장 중복 I/O 생략
 
 ### 2.9.33 (2026-06-30) — 트리 선택 동작
 
@@ -240,7 +252,8 @@
 ### 2.8.6 (2026-06-30) — GitHub 변경 이력 연동
 
 - `CHANGELOG.md` — README/Releases와 동기화되는 공개 changelog
-- `scripts/Publish-GitHubRelease.ps1` — 태그 + `gh release create`
+- `scripts/Publish-GitHubRelease.ps1` — 태그 + `gh release create` + **이전 릴리스 draft**
+- `scripts/Hide-OldGitHubReleases.ps1` — 최신 semver만 공개 (에이전트 규칙: `github-release-latest-only.mdc`)
 - README Releases 배지·CHANGELOG 링크
 - `version-bump-mandatory.mdc` — GitHub 동기화 단계 추가
 

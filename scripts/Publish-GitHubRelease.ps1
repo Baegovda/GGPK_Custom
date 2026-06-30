@@ -80,7 +80,7 @@ try {
 		gh release create $tag --repo $repo --title $title --notes-file $notesFile
 		Write-Host "Created GitHub Release $tag"
 	} else {
-		gh release edit $tag --repo $repo --title $title --notes-file $notesFile
+		gh release edit $tag --repo $repo --title $title --notes-file $notesFile --draft=false
 		Write-Host "Updated GitHub Release $tag"
 	}
 
@@ -100,6 +100,13 @@ try {
 		}
 		gh release upload $tag $zipPath --repo $repo --clobber
 		Write-Host "Uploaded $(Split-Path -Leaf $zipPath)"
+	}
+
+	$hideScript = Join-Path $PSScriptRoot 'Hide-OldGitHubReleases.ps1'
+	if (Test-Path -LiteralPath $hideScript) {
+		& $hideScript -Repo $repo -KeepTag $tag
+	} else {
+		Write-Warning "Missing $hideScript — old releases were not drafted."
 	}
 
 	Write-Host "Done: https://github.com/$repo/releases/tag/$tag"
