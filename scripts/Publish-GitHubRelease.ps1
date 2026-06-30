@@ -60,29 +60,30 @@ try {
 		Write-Host "Tag $tag already exists (use -Force to move it)."
 	}
 
+	git push origin $tag
+	if ($Force) { git push origin $tag --force }
+
+	$repo = 'Baegovda/GGPK_Custom'
 	$releaseExists = $false
-	try {
-		gh release view $tag 2>$null | Out-Null
-		if ($LASTEXITCODE -eq 0) { $releaseExists = $true }
-	} catch { }
+	$ErrorActionPreference = 'SilentlyContinue'
+	gh release view $tag --repo $repo *> $null
+	if ($LASTEXITCODE -eq 0) { $releaseExists = $true }
+	$ErrorActionPreference = $prevEap
 
 	if ($releaseExists -and $Force) {
-		gh release delete $tag --yes
+		gh release delete $tag --repo $repo --yes
 		$releaseExists = $false
 	}
 
 	if (-not $releaseExists) {
-		gh release create $tag --title $title --notes-file $notesFile
+		gh release create $tag --repo $repo --title $title --notes-file $notesFile
 		Write-Host "Created GitHub Release $tag"
 	} else {
-		gh release edit $tag --title $title --notes-file $notesFile
+		gh release edit $tag --repo $repo --title $title --notes-file $notesFile
 		Write-Host "Updated GitHub Release $tag"
 	}
 
-	git push origin $tag
-	if ($Force) { git push origin $tag --force }
-
-	Write-Host "Done: https://github.com/Baegovda/GGPK_Custom/releases/tag/$tag"
+	Write-Host "Done: https://github.com/$repo/releases/tag/$tag"
 } finally {
 	Pop-Location
 }
