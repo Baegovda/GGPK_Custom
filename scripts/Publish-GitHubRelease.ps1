@@ -11,6 +11,7 @@
 #>
 param(
 	[string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+	[string]$Version = '',
 	[switch]$Force
 )
 
@@ -20,33 +21,38 @@ Push-Location $RepoRoot
 
 try {
 	$props = Get-Content 'Directory.Build.props' -Raw
-	if ($props -notmatch '<Version>([^<]+)</Version>') {
-		throw 'Could not parse <Version> from Directory.Build.props'
+	if ([string]::IsNullOrWhiteSpace($Version)) {
+		if ($props -notmatch '<Version>([^<]+)</Version>') {
+			throw 'Could not parse <Version> from Directory.Build.props'
+		}
+		$Version = $Matches[1].Trim()
 	}
-	$version = $Matches[1].Trim()
-	$tag = "v$version"
+	$tag = "v$Version"
 
 	$changelog = Get-Content 'CHANGELOG.md' -Raw
-	$pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)"
+	$pattern = "(?ms)^## \[$([regex]::Escape($Version))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)"
 	if ($changelog -notmatch $pattern) {
-		throw "No ## [$version] section in CHANGELOG.md — add it before publishing."
+		throw "No ## [$Version] section in CHANGELOG.md — add it before publishing."
 	}
 	$notes = $Matches[1].Trim()
 	if ([string]::IsNullOrWhiteSpace($notes)) {
-		throw "CHANGELOG section for [$version] is empty."
+		throw "CHANGELOG section for [$Version] is empty."
 	}
 
-	$title = "VisualGGPK3 $version"
-	$notesFile = Join-Path $env:TEMP "ggpk-release-$version.md"
+	$title = "VisualGGPK3 $Version"
+	$notesFile = Join-Path $env:TEMP "ggpk-release-$Version.md"
 	Set-Content -Path $notesFile -Value $notes -Encoding UTF8
 
 	$tagExists = $false
-	$null = git rev-parse $tag 2>$null
+	$prevEap = $ErrorActionPreference
+	$ErrorActionPreference = 'SilentlyContinue'
+	git rev-parse --verify "refs/tags/$tag" *> $null
 	if ($LASTEXITCODE -eq 0) { $tagExists = $true }
+	$ErrorActionPreference = $prevEap
 
 	if (-not $tagExists) {
 		git tag -a $tag -m $title
-		Write-Host "Created tag $tag"
+		Write-Host "Created tag $tag on HEAD"
 	} elseif ($Force) {
 		git tag -f -a $tag -m $title
 		Write-Host "Recreated tag $tag"
