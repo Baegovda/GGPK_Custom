@@ -13,12 +13,14 @@ internal sealed class MediaPreviewPanel : Panel {
 	private const double AutoHideSeconds = 5.0;
 	private const int OverlayHeaderHeight = 28;
 	private const int SpriteControlsHeight = 36;
-	private const int OverlayMaxWidth = 300;
+	private const int OverlayMinWidth = 280;
+	private const int OverlayMaxWidth = 560;
 	private const int StatusOverlayMaxWidth = 380;
 	private const int OverlayInfoMinHeight = 36;
-	private const int OverlayInfoMaxHeight = 92;
+	private const int OverlayInfoMaxHeight = 120;
 	private const int StatusOverlayMaxHeight = 260;
 	private const int OverlayLineHeight = 16;
+	private const int PathBlockHeight = 34;
 
 	private readonly PixelLayout pixelLayout = new();
 	private readonly ZoomableImageView imageView = new();
@@ -52,6 +54,21 @@ internal sealed class MediaPreviewPanel : Panel {
 		Border = BorderType.None,
 		Wrap = true
 	};
+	private readonly Label pathCaption = new() {
+		Text = "Path",
+		TextColor = new Color(0.72f, 0.72f, 0.76f)
+	};
+	private readonly Label pathValue = new() {
+		TextColor = Colors.White,
+		Wrap = WrapMode.None,
+		VerticalAlignment = VerticalAlignment.Top
+	};
+	private readonly Label detailsLabel = new() {
+		TextColor = Colors.White,
+		Wrap = WrapMode.Word,
+		VerticalAlignment = VerticalAlignment.Top
+	};
+	private readonly Panel imageInfoPanel;
 	private readonly UITimer autoHideTimer;
 	private bool audioMode;
 	private bool videoMode;
@@ -73,7 +90,7 @@ internal sealed class MediaPreviewPanel : Panel {
 
 		var header = new StackLayout {
 			Orientation = Orientation.Horizontal,
-			Spacing = 4,
+			Spacing = 8,
 			Items = {
 				viewOriginalButton,
 				new StackLayoutItem(new Panel(), expand: true),
@@ -81,12 +98,22 @@ internal sealed class MediaPreviewPanel : Panel {
 			}
 		};
 		var overlayHeader = new Panel { Content = header, Height = OverlayHeaderHeight };
+		imageInfoPanel = new StackLayout {
+			Orientation = Orientation.Vertical,
+			Spacing = 2,
+			Items = {
+				pathCaption,
+				new StackLayoutItem(pathValue, expand: true),
+				new StackLayoutItem(detailsLabel, expand: true)
+			}
+		};
 		var overlayLayout = new StackLayout {
 			Orientation = Orientation.Vertical,
-			Spacing = 4,
+			Spacing = 6,
 			Items = {
 				overlayHeader,
 				spritePlayerView,
+				imageInfoPanel,
 				infoText
 			}
 		};
@@ -148,6 +175,8 @@ internal sealed class MediaPreviewPanel : Panel {
 		videoPlayerView.Visible = false;
 		overlayHoverZone.Visible = false;
 		autoHideCheck.Visible = false;
+		imageInfoPanel.Visible = false;
+		infoText.Visible = true;
 		BackgroundColor = Colors.Transparent;
 		infoText.Text = text;
 		overlayBox.Visible = true;
@@ -167,6 +196,8 @@ internal sealed class MediaPreviewPanel : Panel {
 		videoPlayerView.Visible = false;
 		overlayHoverZone.Visible = false;
 		autoHideCheck.Visible = true;
+		imageInfoPanel.Visible = true;
+		infoText.Visible = false;
 		BackgroundColor = Colors.Transparent;
 
 		UnloadSprite();
@@ -187,7 +218,9 @@ internal sealed class MediaPreviewPanel : Panel {
 		}
 
 		overlayHeader.Visible = true;
-		infoText.Text = info;
+		pathValue.Text = path ?? "";
+		pathValue.ToolTip = path;
+		detailsLabel.Text = info;
 		overlayBox.Visible = true;
 		Relayout();
 		ScheduleAutoHide();
@@ -251,7 +284,11 @@ internal sealed class MediaPreviewPanel : Panel {
 		videoPlayerView.Visible = false;
 		overlayBox.Visible = false;
 		overlayHoverZone.Visible = false;
+		imageInfoPanel.Visible = false;
+		infoText.Visible = false;
 		BackgroundColor = Colors.Transparent;
+		pathValue.Text = "";
+		detailsLabel.Text = "";
 		infoText.Text = "";
 	}
 
@@ -423,13 +460,15 @@ internal sealed class MediaPreviewPanel : Panel {
 
 		if (statusMode && overlayBox.Visible) {
 			spritePlayerView.Visible = false;
+			imageInfoPanel.Visible = false;
+			infoText.Visible = true;
 			var statusWidth = Math.Min(Width - OverlayMargin * 2, StatusOverlayMaxWidth);
-			var infoHeight = Math.Clamp(MeasureInfoHeight(statusWidth), OverlayInfoMinHeight, StatusOverlayMaxHeight);
-			var statusOverlayHeight = infoHeight + overlayBox.Padding.Vertical;
+			var statusInfoHeight = Math.Clamp(MeasureWrappedTextHeight(infoText.Text, statusWidth), OverlayInfoMinHeight, StatusOverlayMaxHeight);
+			var statusOverlayHeight = statusInfoHeight + overlayBox.Padding.Vertical;
 			lastOverlaySize = new Size(statusWidth, statusOverlayHeight);
 			lastOverlayPosition = new Point(OverlayMargin, Height - statusOverlayHeight - OverlayMargin);
 			overlayBox.Size = lastOverlaySize;
-			infoText.Height = infoHeight;
+			infoText.Size = new Size(statusWidth - overlayBox.Padding.Horizontal, statusInfoHeight);
 			overlayHoverZone.Visible = false;
 			pixelLayout.Move(overlayBox, lastOverlayPosition.X, lastOverlayPosition.Y);
 			return;
@@ -451,35 +490,58 @@ internal sealed class MediaPreviewPanel : Panel {
 		}
 
 		overlayBox.Size = lastOverlaySize;
-		var spriteHeight = spriteMode && spritePlayerView.Visible ? SpriteControlsHeight : 0;
+		var spriteHeight = spriteMode ? SpriteControlsHeight : 0;
+		imageInfoPanel.Visible = true;
+		infoText.Visible = false;
+		var contentWidth = Math.Max(120, overlayWidth - overlayBox.Padding.Horizontal);
+		var detailsHeight = Math.Clamp(
+			MeasureWrappedTextHeight(detailsLabel.Text, contentWidth),
+			OverlayLineHeight,
+			OverlayInfoMaxHeight - PathBlockHeight);
+		var infoHeight = PathBlockHeight + detailsHeight + 4;
+		imageInfoPanel.Size = new Size(contentWidth, infoHeight);
+		pathValue.Size = new Size(contentWidth, OverlayLineHeight + 2);
+		detailsLabel.Size = new Size(contentWidth, detailsHeight);
 		spritePlayerView.Height = spriteHeight;
 		spritePlayerView.Visible = spriteMode;
-		infoText.Height = Math.Max(OverlayInfoMinHeight, overlayHeight - spriteHeight - overlayBox.Padding.Vertical - OverlayHeaderHeight);
 		overlayBox.Visible = true;
 		overlayHoverZone.Visible = false;
 		pixelLayout.Move(overlayBox, lastOverlayPosition.X, lastOverlayPosition.Y);
 	}
 
 	private void ComputeImageOverlaySize(out int overlayWidth, out int overlayHeight) {
-		overlayWidth = Math.Min(Width - OverlayMargin * 2, OverlayMaxWidth);
-		var spriteHeight = spriteMode && spritePlayerView.Visible ? SpriteControlsHeight : 0;
-		var infoHeight = Math.Clamp(MeasureInfoHeight(overlayWidth), OverlayInfoMinHeight, OverlayInfoMaxHeight);
+		overlayWidth = ComputeOverlayContentWidth();
+		var spriteHeight = spriteMode ? SpriteControlsHeight : 0;
+		var contentWidth = Math.Max(120, overlayWidth - overlayBox.Padding.Horizontal);
+		var detailsHeight = Math.Clamp(
+			MeasureWrappedTextHeight(detailsLabel.Text, contentWidth),
+			OverlayLineHeight,
+			OverlayInfoMaxHeight - PathBlockHeight);
+		var infoHeight = Math.Max(OverlayInfoMinHeight, PathBlockHeight + detailsHeight + 4);
 		overlayHeight = infoHeight + overlayBox.Padding.Vertical + OverlayHeaderHeight + spriteHeight;
 	}
 
-	private int MeasureInfoHeight(int width) {
-		if (string.IsNullOrEmpty(infoText.Text))
-			return OverlayInfoMinHeight;
+	private int ComputeOverlayContentWidth() {
+		var available = Width - OverlayMargin * 2;
+		var preferred = (int)(Width * 0.72);
+		return Math.Clamp(Math.Min(preferred, available), OverlayMinWidth, Math.Min(available, OverlayMaxWidth));
+	}
+
+	private int MeasureWrappedTextHeight(string text, int width) {
+		if (string.IsNullOrEmpty(text))
+			return OverlayLineHeight;
 
 		var textWidth = Math.Max(120, width - overlayBox.Padding.Horizontal);
-		var charsPerLine = Math.Max(18, textWidth / 7);
+		var charsPerLine = Math.Max(24, textWidth / 7);
 		var totalLines = 0;
-		foreach (var line in infoText.Text.Split('\n')) {
+		foreach (var line in text.Split('\n')) {
 			var length = string.IsNullOrEmpty(line) ? 1 : line.Length;
 			totalLines += (length + charsPerLine - 1) / charsPerLine;
 		}
-		return Math.Max(OverlayInfoMinHeight, totalLines * OverlayLineHeight + 8);
+		return Math.Max(OverlayLineHeight, totalLines * OverlayLineHeight + 4);
 	}
+
+	private int MeasureInfoHeight(int width) => MeasureWrappedTextHeight(infoText.Text, width);
 
 	private static string BuildVideoDetails(FileTreeItem fileItem, ReadOnlyMemory<byte> data) {
 		var sb = new StringBuilder();

@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.9.29` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.29)` |
+| **솔루션 / 어셈블리** | `2.9.30` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.30)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -53,6 +53,10 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.30 (2026-06-30) — 미리보기 정보 오버레이
+
+- `MediaPreviewPanel` — Path 별도 Label(한 줄), 상세 정보 분리, 오버레이 너비 72%·최대 560px
 
 ### 2.9.29 (2026-06-30) — 게임 실행 중 GGPK 경고
 

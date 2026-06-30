@@ -1145,7 +1145,6 @@ public sealed class MainWindow : Form {
 
 	private void ShowImagePreview(FileTreeItem fileItem, Bitmap bitmap, int fileSize, string? extraInfo = null, string? displayFormat = null) {
 		var sb = new StringBuilder();
-		sb.AppendLine($"Path: {fileItem.GetPath()}");
 		sb.AppendLine($"File: {fileItem.Name}");
 		sb.AppendLine($"Size: {FormatByteSize(fileSize)}");
 		sb.AppendLine($"Dimensions: {bitmap.Width} x {bitmap.Height}");
