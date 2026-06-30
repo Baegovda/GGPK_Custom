@@ -6,15 +6,21 @@ namespace VisualGGPK3;
 
 public static class FileFormatFilter {
 	private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase);
+	private static bool uvSequenceOnly;
 
 	public static int Version { get; private set; }
 
-	public static bool IsActive => Extensions.Count > 0;
+	public static bool IsActive => Extensions.Count > 0 || uvSequenceOnly;
 
-	public static void Clear() => Set(null);
+	public static void Clear() {
+		Extensions.Clear();
+		uvSequenceOnly = false;
+		++Version;
+	}
 
 	public static void Set(string? text) {
 		Extensions.Clear();
+		uvSequenceOnly = false;
 		if (!string.IsNullOrWhiteSpace(text)) {
 			foreach (var part in text.Split([' ', ',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) {
 				if (part.Length == 0)
@@ -25,18 +31,28 @@ public static class FileFormatFilter {
 		++Version;
 	}
 
-	public static void SetPreset(string preset) => Set(preset switch {
-		"Images" => ".dds .png .jpg .jpeg .bmp .gif .tiff .ico .header",
-		"Text" => ".txt .xml .json .csv .filter .fx .hlsl .properties .ui .amd",
-		"Data" => ".dat .dat64 .datc .datl",
-		"Audio" => ".ogg .wav .bank .mp3",
-		"Video" => ".bk2 .mp4",
-		_ => null
-	});
+	public static void SetPreset(string preset) {
+		Extensions.Clear();
+		uvSequenceOnly = preset == "UvSequence";
+		if (uvSequenceOnly) {
+			++Version;
+			return;
+		}
+		Set(preset switch {
+			"Images" => ".dds .png .jpg .jpeg .bmp .gif .tiff .ico .header",
+			"Text" => ".txt .xml .json .csv .filter .fx .hlsl .properties .ui .amd",
+			"Data" => ".dat .dat64 .datc .datl",
+			"Audio" => ".ogg .wav .bank .mp3",
+			"Video" => ".bk2 .mp4",
+			_ => null
+		});
+	}
 
-	public static bool Matches(string fileName) {
+	public static bool Matches(string fileName, string? path = null) {
 		if (!IsActive)
 			return true;
+		if (uvSequenceOnly)
+			return UvSequenceGrid.TryParse(fileName, path, out _);
 		return Extensions.Contains(Path.GetExtension(fileName));
 	}
 }

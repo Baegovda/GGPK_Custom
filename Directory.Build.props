@@ -1,7 +1,7 @@
 <Project>
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
-		<Version>2.8.7</Version>
+		<Version>2.9.27</Version>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<CheckForOverflowUnderflow Condition="$(Configuration) == 'Debug'">true</CheckForOverflowUnderflow>
@@ -9,7 +9,8 @@
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
 		<IsAotCompatible>true</IsAotCompatible>
 		<RollForward>LatestMajor</RollForward>
-		<BaseOutputPath>$(SolutionDir)bin/</BaseOutputPath>
+		<BaseOutputPath Condition="'$(SolutionDir)' != ''">$(SolutionDir)bin/</BaseOutputPath>
+		<BaseOutputPath Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)bin/</BaseOutputPath>
 		<OutDir>$(BaseOutputPath)$(Configuration)/</OutDir>
 		<NoWarn>1573;1591</NoWarn>
 		<PathMap>$(MSBuildProjectDirectory)=$(MSBuildProjectName)</PathMap>

@@ -38,24 +38,20 @@ public abstract class DirectoryTreeItem : ITreeItem {
 
 	public virtual bool Initialized { get; protected internal set; }
 
-	private TreeItem? loadingPlaceholder;
-
 	public virtual ITreeItem this[int index] {
 		get {
-			if (!Initialized) {
-				loadingPlaceholder ??= new TreeItem { Text = "Loading . . .", Parent = this };
-				return loadingPlaceholder;
-			}
+			if (!Initialized)
+				throw new InvalidOperationException("Tree node is not expanded yet.");
 			var items = ChildItems;
 			if ((uint)index >= (uint)items.Count) {
 				if (items.Count == 0)
-					return new TreeItem { Text = "", Parent = this };
+					throw new ArgumentOutOfRangeException(nameof(index));
 				index = items.Count - 1;
 			}
 			return items[index];
 		}
 	}
-	public virtual int Count => Initialized ? ChildItems.Count : 1;
+	public virtual int Count => Initialized ? ChildItems.Count : 0;
 
 	public virtual bool Expandable => !Initialized || Count > 0;
 
@@ -68,7 +64,8 @@ public abstract class DirectoryTreeItem : ITreeItem {
 			_Expanded = value;
 			if (value && !Initialized)
 				Initialized = true;
-			Tree.RefreshItem(this);
+			var self = this;
+			Application.Instance.AsyncInvoke(() => Tree.RefreshItem(self));
 		}
 	}
 

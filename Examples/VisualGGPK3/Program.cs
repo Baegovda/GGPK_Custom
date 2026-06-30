@@ -12,11 +12,16 @@ public static class Program {
 	[STAThread]
 	public static void Main(string[] args) {
 		DiagnosticLog.Initialize();
+#if Windows
 		Core.Initialize();
+#endif
 #if Mac
 		Eto.Style.Add<Eto.Mac.Forms.ApplicationHandler>(null, handler => handler.AllowClosingMainForm = true);
 #endif
 		var app = new Application();
+#if Windows
+		WpfDarkTheme.Initialize();
+#endif
 		DiagnosticLog.AttachApplication(app);
 		var form = new MainWindow(args.Length != 0 ? args[0] : null);
 		app.UnhandledException += (_, e) => {

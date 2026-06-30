@@ -20,8 +20,14 @@
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="*" PrivateAssets="All" />
 	</ItemGroup>
 
+	<PropertyGroup>
+		<_RepoRoot Condition="'$(SolutionDir)' != ''">$(SolutionDir)</_RepoRoot>
+		<_RepoRoot Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</_RepoRoot>
+		<_Oo2CoreSource>$(_RepoRoot)LibBundle3/oo2core/oo2core.dll</_Oo2CoreSource>
+	</PropertyGroup>
+
 	<!-- Copy Oodle runtime library next to built executables -->
-	<Target Name="CopyOo2Core" AfterTargets="Build" Condition="'$(OutputType)' == 'Exe' And Exists('$(SolutionDir)LibBundle3/oo2core/oo2core.dll')">
-		<Copy SourceFiles="$(SolutionDir)LibBundle3/oo2core/oo2core.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+	<Target Name="CopyOo2Core" AfterTargets="Build" Condition="('$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe') And Exists('$(_Oo2CoreSource)')">
+		<Copy SourceFiles="$(_Oo2CoreSource)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
 	</Target>
 </Project>

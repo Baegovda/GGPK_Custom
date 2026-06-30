@@ -57,11 +57,21 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 
 	private bool FilterItem(ITreeItem item) => item switch {
 		FileTreeItem f => TreeViewFilter.MatchesFile(f),
-		GGPKDirectoryTreeItem d => d.HasMatchingDescendant(),
+		GGPKDirectoryTreeItem d => d.HasFilteredVisibleChild(),
 		_ => true
 	};
 
-	internal bool HasMatchingDescendant() => HasMatchingInRecord(Record);
+	internal bool HasFilteredVisibleChild() {
+		if (!TreeViewFilter.IsActive)
+			return GetAllChildren().Count > 0;
+		foreach (var child in GetAllChildren()) {
+			if (FilterItem(child))
+				return true;
+		}
+		return false;
+	}
+
+	internal bool HasMatchingDescendant() => HasFilteredVisibleChild();
 
 	internal FileTreeItem? FindFileByPath(string path) {
 		path = FavoritePaths.Normalize(path);
@@ -80,6 +90,23 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 		}
 		dir.Expanded = true;
 		return dir.FindChildFile(segments[^1]);
+	}
+
+	internal DirectoryTreeItem? FindDirectoryByPath(string path) {
+		path = FavoritePaths.DirectoryLookupPath(path);
+		if (string.IsNullOrEmpty(path))
+			return this;
+		var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		var dir = this;
+		foreach (var segment in segments) {
+			var childDir = dir.FindChildDirectory(segment);
+			if (childDir is null)
+				return null;
+			childDir.Expanded = true;
+			dir = childDir;
+		}
+		dir.Expanded = true;
+		return dir;
 	}
 
 	internal GGPKDirectoryTreeItem? FindChildDirectory(string name) {
@@ -104,17 +131,9 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 		return null;
 	}
 
-	private static bool HasMatchingInRecord(DirectoryRecord record) {
-		foreach (var tn in record) {
-			if (tn is FileRecord fr && TreeViewFilter.MatchesPath(fr.GetPath()))
-				return true;
-			if (tn is DirectoryRecord dr && HasMatchingInRecord(dr))
-				return true;
-		}
-		return false;
-	}
-
 	protected internal override IEnumerable<ITreeItem> EnumerateAllChildren() => GetAllChildren();
+
+	public override bool Expandable => !Initialized ? HasFilteredVisibleChild() : Count > 0;
 
 	protected internal override void InvalidateFilterCache() {
 		_ChildItems = null;

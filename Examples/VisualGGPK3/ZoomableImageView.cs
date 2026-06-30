@@ -22,9 +22,8 @@ public sealed class ZoomableImageView : Panel {
 	private double zoom = 1.0;
 	private bool panning;
 	private Point panStartMouse;
-	private Point panStartScroll;
-	private Point panStartOffset;
-	private Point panOffset;
+	private Point panStartOrigin;
+	private Point imageOrigin;
 
 	private const double ZoomStep = 1.15;
 	private const double MinZoom = 0.05;
@@ -61,11 +60,9 @@ public sealed class ZoomableImageView : Panel {
 		set {
 			sourceBitmap = value as Bitmap;
 			zoom = 1.0;
-			panOffset = Point.Empty;
-			scrollable.ScrollPosition = Point.Empty;
 			zoomBadge.Visible = sourceBitmap is not null;
 			UpdateZoomLabel();
-			ApplyZoom();
+			ApplyZoom(centerImage: true);
 			UpdatePanCursor();
 		}
 	}
@@ -101,35 +98,13 @@ public sealed class ZoomableImageView : Panel {
 	private void BeginPan(Point viewportMouse) {
 		panning = true;
 		panStartMouse = viewportMouse;
-		panStartScroll = scrollable.ScrollPosition;
-		panStartOffset = panOffset;
+		panStartOrigin = imageOrigin;
 		canvas.Cursor = Cursors.SizeAll;
 	}
 
 	private void ContinuePan(Point viewportMouse) {
-		var delta = viewportMouse - panStartMouse;
-		if (UsesScrollPan()) {
-			SetScrollPosition(new Point(panStartScroll.X - delta.X, panStartScroll.Y - delta.Y));
-			return;
-		}
-		panOffset = panStartOffset + delta;
+		imageOrigin = panStartOrigin + (viewportMouse - panStartMouse);
 		canvas.Invalidate();
-	}
-
-	private bool UsesScrollPan() {
-		var client = scrollable.ClientSize;
-		var content = canvas.Size;
-		return content.Width > client.Width || content.Height > client.Height;
-	}
-
-	private void SetScrollPosition(Point pos) {
-		var client = scrollable.ClientSize;
-		var content = canvas.Size;
-		var maxX = Math.Max(0, content.Width - client.Width);
-		var maxY = Math.Max(0, content.Height - client.Height);
-		scrollable.ScrollPosition = new Point(
-			Math.Clamp(pos.X, 0, maxX),
-			Math.Clamp(pos.Y, 0, maxY));
 	}
 
 	private Point ToScrollablePoint(Control? sender, PointF location) {
@@ -148,8 +123,8 @@ public sealed class ZoomableImageView : Panel {
 	private void OnPaint(object? sender, PaintEventArgs e) {
 		if (sourceBitmap is null)
 			return;
-		var (_, offset, imageSize) = GetCanvasLayout();
-		e.Graphics.DrawImage(sourceBitmap, offset.X, offset.Y, imageSize.Width, imageSize.Height);
+		var imageSize = GetScaledImageSize(zoom);
+		e.Graphics.DrawImage(sourceBitmap, imageOrigin.X, imageOrigin.Y, imageSize.Width, imageSize.Height);
 	}
 
 	private void OnMouseWheel(object? sender, MouseEventArgs e) {
@@ -166,31 +141,13 @@ public sealed class ZoomableImageView : Panel {
 		if (Math.Abs(zoom - oldZoom) < 1e-9)
 			return;
 
-		var (_, oldOffset, _) = GetCanvasLayout(oldZoom);
-		var scrollPos = scrollable.ScrollPosition;
-		double imageX;
-		double imageY;
-		if (UsesScrollPan()) {
-			imageX = (scrollPos.X + viewport.X - oldOffset.X) / oldZoom;
-			imageY = (scrollPos.Y + viewport.Y - oldOffset.Y) / oldZoom;
-		} else {
-			imageX = (viewport.X - oldOffset.X) / oldZoom;
-			imageY = (viewport.Y - oldOffset.Y) / oldZoom;
-		}
-
-		ApplyZoom();
-
-		var (_, newOffset, _) = GetCanvasLayout();
-		if (UsesScrollPan()) {
-			SetScrollPosition(new Point(
-				(int)Math.Round(newOffset.X + imageX * zoom - viewport.X),
-				(int)Math.Round(newOffset.Y + imageY * zoom - viewport.Y)));
-		} else {
-			panOffset = new Point(
-				(int)Math.Round(viewport.X - newOffset.X - imageX * zoom),
-				(int)Math.Round(viewport.Y - newOffset.Y - imageY * zoom));
-			canvas.Invalidate();
-		}
+		var imageX = (viewport.X - imageOrigin.X) / oldZoom;
+		var imageY = (viewport.Y - imageOrigin.Y) / oldZoom;
+		imageOrigin = new Point(
+			(int)Math.Round(viewport.X - imageX * zoom),
+			(int)Math.Round(viewport.Y - imageY * zoom));
+		canvas.Invalidate();
+		UpdateZoomLabel();
 	}
 
 	private PointF GetViewportCursor(Control? sender, MouseEventArgs e) {
@@ -202,24 +159,28 @@ public sealed class ZoomableImageView : Panel {
 		return scrollable.PointFromScreen(screen);
 	}
 
-	private void ApplyZoom() {
+	private void ApplyZoom(bool centerImage = false) {
 		if (sourceBitmap is null)
 			return;
 
-		var (canvasSize, _, _) = GetCanvasLayout();
-		canvas.Size = canvasSize;
-		canvas.MinimumSize = canvasSize;
+		var client = GetClientSize();
+		canvas.Size = client;
+		canvas.MinimumSize = client;
+		if (centerImage)
+			CenterImage();
 		canvas.Invalidate();
 		scrollable.UpdateScrollSizes();
-		if (UsesScrollPan()) {
-			panOffset = Point.Empty;
-			SetScrollPosition(scrollable.ScrollPosition);
-		} else {
-			scrollable.ScrollPosition = Point.Empty;
-			canvas.Invalidate();
-		}
+		scrollable.ScrollPosition = Point.Empty;
 		UpdateZoomLabel();
 		UpdatePanCursor();
+	}
+
+	private void CenterImage() {
+		var client = GetClientSize();
+		var imageSize = GetScaledImageSize(zoom);
+		imageOrigin = new Point(
+			(client.Width - imageSize.Width) / 2,
+			(client.Height - imageSize.Height) / 2);
 	}
 
 	private Size GetScaledImageSize(double forZoom) {
@@ -230,36 +191,20 @@ public sealed class ZoomableImageView : Panel {
 			Math.Max(1, (int)Math.Round(sourceBitmap.Height * forZoom)));
 	}
 
-	private (Size canvasSize, Point imageOffset, Size imageSize) GetCanvasLayout() => GetCanvasLayout(zoom);
-
-	private (Size canvasSize, Point imageOffset, Size imageSize) GetCanvasLayout(double forZoom) {
-		var imageSize = GetScaledImageSize(forZoom);
-		if (sourceBitmap is null)
-			return (Size.Empty, Point.Empty, Size.Empty);
+	private Size GetClientSize() {
 		var client = scrollable.ClientSize;
-		var clientWidth = client.Width > 0 ? client.Width : imageSize.Width;
-		var clientHeight = client.Height > 0 ? client.Height : imageSize.Height;
-		var canvasWidth = Math.Max(imageSize.Width, clientWidth);
-		var canvasHeight = Math.Max(imageSize.Height, clientHeight);
-		var offset = new Point((canvasWidth - imageSize.Width) / 2, (canvasHeight - imageSize.Height) / 2);
-		if (!UsesScrollPanForLayout(canvasWidth, canvasHeight, client))
-			offset += panOffset;
-		return (
-			new Size(canvasWidth, canvasHeight),
-			offset,
-			imageSize);
+		if (client.Width > 0 && client.Height > 0)
+			return client;
+		if (Width > 0 && Height > 0)
+			return new Size(Width, Height);
+		return new Size(1, 1);
 	}
-
-	private bool UsesScrollPanForLayout(int canvasWidth, int canvasHeight, Size client) =>
-		canvasWidth > client.Width || canvasHeight > client.Height;
 
 	private void ResetZoom() {
 		if (sourceBitmap is null)
 			return;
 		zoom = 1.0;
-		panOffset = Point.Empty;
-		scrollable.ScrollPosition = Point.Empty;
-		ApplyZoom();
+		ApplyZoom(centerImage: true);
 	}
 
 	private void UpdateZoomLabel() => zoomLabel.Text = $"{Math.Round(zoom * 100)}%";

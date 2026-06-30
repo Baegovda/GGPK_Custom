@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.8.7` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.7)` |
+| **솔루션 / 어셈블리** | `2.9.27` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.27)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -34,7 +34,8 @@
    - **`CHANGELOG.md`** → `## [X.Y.Z]` 섹션 (GitHub 공개용, handoff와 동기화)
    - `README.md` — 배지·기능 표 (필요 시)
 4. **GitHub Release** — push 후 `scripts/Publish-GitHubRelease.ps1` 실행  
-   → `vX.Y.Z` 태그 + [Releases](https://github.com/Baegovda/GGPK_Custom/releases)에 CHANGELOG 본문 게시
+   → `vX.Y.Z` 태그 + [Releases](https://github.com/Baegovda/GGPK_Custom/releases)에 CHANGELOG 본문 게시  
+   → 인앱 업데이트용 zip: `Publish-GitHubRelease.ps1 -Package` (또는 `Package-VisualGGPK3Release.ps1` 후 `gh release upload`)
 5. **changelog 형식** — 버전별로:
    - 한 줄 요약
    - bullet으로 사용자 관점 변경점
@@ -52,6 +53,155 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.27 (2026-06-30) — 상단 UI 레이아웃 수정
+
+- `MainWindow` / `TreeFilterBar` — `TableLayout` → `DynamicLayout`, 상단·필터 영역 세로 늘어남 방지
+- 타입 칩 2줄 배치 (All~Text / Data~Video)
+- `WpfDarkTheme` — 전역 ScrollBar 스타일 제거, 버튼·TextBox 높이 고정
+
+### 2.9.26 (2026-06-30) — 드래그 다중 선택 수정
+
+- `TreeMultiSelection` — `SelectRange` 후 `ApplyVisuals` 호출
+- 마퀴: 드래그 임계값 이후 시작, `CaptureMouse`/`FinishMarqueeSelection`으로 박스 잔류 방지
+- `FindAdornerLayer` — 상위 시각 트리에서 AdornerLayer 탐색
+
+### 2.9.25 (2026-06-30) — Favorites 별 아이콘
+
+- `TreeItemIcons.FavoriteStar` — Favorites 패널 헤더 앞 금색 별
+
+### 2.9.24 (2026-06-30) — 타입 필터 빈 폴더
+
+- `HasFilteredVisibleChild` — 폴더 표시 여부를 필터된 자식과 동일 규칙으로 판단
+- `Expandable` — 필터 활성 시 매칭 하위가 없으면 확장 아이콘 숨김
+- `TreeRefresh.RefreshInitializedBranches` — 필터 변경 시 펼쳐진 가지 UI 동기화
+
+### 2.9.23 (2026-06-30) — 트리 다중 선택
+
+- `TreeItemIdentity` / `PathItemComparer` — 경로 기반 선택 집합 (WPF·Eto 인스턴스 불일치 해결)
+- `TreeMultiSelection` — Explorer식 클릭·Shift 범위·Ctrl 토글·드래그 범위·마퀴 선택
+
+### 2.9.22 (2026-06-30) — Right 키 트리 탐색
+
+- `MainWindow.TryHandleRightArrow` — 접힌 폴더 펼치기, 펼친 폴더는 다음 보이는 항목, 파일은 다음 파일로 이동
+
+### 2.9.21 (2026-06-30) — 정보 오버레이 크기
+
+- `MediaPreviewPanel` — 파일 상세정보 박스 최대 너비 300px·높이 제한, 왼쪽 아래 고정; 로드 상태도 동일 스타일
+
+### 2.9.20 (2026-06-30) — 인앱 자동 업데이트
+
+- `AppUpdater` — `Version.txt` + GitHub Releases API로 최신 확인, zip 다운로드·robocopy 적용·재시작
+- `MainWindow` — **Update** 툴바 버튼, 새 버전 시 `Update vX.Y.Z` 강조
+- `Package-VisualGGPK3Release.ps1` / `Publish-GitHubRelease.ps1 -Package` — `VisualGGPK3-win-x64.zip` 업로드
+
+### 2.9.19 (2026-06-30) — 슬라이더 UI
+
+- `WpfDarkTheme` — 단일 트랙 슬라이더 템플릿 (볼륨/시크 이중 줄 제거)
+- `VideoPlayerView` / `SpriteSheetPlayerView` — 슬라이더·버튼 테마 적용
+
+### 2.9.18 (2026-06-30) — 다크 타이틀바 수정
+
+- `WpfDarkTheme` — `Style.Add<FormHandler>` 전역 훅, HWND 준비 후 DWM 재적용·프레임 갱신
+
+### 2.9.17 (2026-06-30) — 오디오 플레이어 UI
+
+- `AudioPlayerView` — 카드형 레이아웃, 바 비주얼라이저, 재생 상태·볼륨 %, `AppTheme`/`WpfDarkTheme` 슬라이더
+
+### 2.9.16 (2026-06-30) — 즐겨찾기 필터 우회
+
+- `TreeViewFilter.RevealPath` — 즐겨찾기 이동 시 해당 경로·상위 폴더만 필터 무시하고 표시
+- 필터 변경·Reset 시 reveal 해제
+
+### 2.9.15 (2026-06-30) — WPF 트리 크래시
+
+- `LoadFileAsync` — 백그라운드 로드 후 UI 갱신을 UI 스레드로 마샬링
+- `DirectoryTreeItem` — lazy placeholder Count 제거, `RefreshItem` 지연
+- `TreeRefresh` — 필터 갱신 refresh를 `AsyncInvoke`로 지연
+
+### 2.9.14 (2026-06-30) — oo2core 배포
+
+- `Directory.Build.targets` — `WinExe` 빌드에도 `oo2core.dll` 복사
+- `Directory.Build.props` — 솔루션 없이 빌드해도 루트 `bin\Debug` 출력
+- `MainWindow` — oo2core 누락 시 setup 안내
+
+### 2.9.13 (2026-06-30) — UV 시퀀스 파일명 파싱
+
+- `UvSequenceGrid` — 확장자 제거 후 `NxM` 매칭 (`sim_wispy_01_6x6.dds` 등)
+
+### 2.9.12 (2026-06-30) — Auto hide 호버 복원
+
+- `MediaPreviewPanel` — 숨김 후 정보 박스 영역 호버 시 다시 표시 (`MouseMove` 영역 감지, WPF 투명 패널 hit-test)
+
+### 2.9.11 (2026-06-30) — UV Seq 필터
+
+- `FileFormatFilter` / `TreeFilterBar` — **UV Seq** 칩 (`UvSequenceGrid` `NxM` 패턴 매칭)
+
+### 2.9.10 (2026-06-30) — UV 시퀀스 자동 재생
+
+- UV 시퀀스 파일 선택 시 프레임 애니메이션 자동 시작 (2프레임 이상)
+
+### 2.9.9 (2026-06-30) — UV 시퀀스 원본 보기
+
+- `MediaPreviewPanel` — UV 시퀀스 시 정보 박스 **View original** / **View sequence** 토글
+
+### 2.9.8 (2026-06-30) — → 키 다음 파일 단일 선택
+
+- `TrySelectNextVisibleItem` — `tree.SelectedItem` 동기화 (WPF·다중 선택 하이라이트 겹침 방지)
+- 파일에서 → 시 `GetNextFileItem` (폴더 건너뛰고 다음 파일만)
+- `TreeMultiSelection.SelectRange` — 경로 기반 인덱스 매칭
+
+### 2.9.7 (2026-06-30) — 유형 필터 칩 UI
+
+- `TreeFilterBar` — DropDown 제거, All/Images/Text/Data/Audio/Video 칩 버튼 (1클릭 선택, 강조색)
+
+### 2.9.6 (2026-06-30) — 이미지 드래그 팬
+
+- `ZoomableImageView` — `imageOrigin` 기준 팬; 스크롤 유무와 관계없이 드래그 이동
+
+### 2.9.5 (2026-06-30) — 즐겨찾기 클릭 즉시 미리보기
+
+- `FavoritesPanel` — 마우스 클릭 시 `FavoriteSelected` 즉시 발생 (WPF `PreviewMouseLeftButtonDown`)
+- 키보드 선택은 기존 `SelectionChanged` 유지
+
+### 2.9.4 (2026-06-30) — 스크롤바 다크 테마
+
+- `WpfDarkTheme` — 앱 전역 `ScrollBar`/`ScrollViewer` 스타일 (트랙 `#1e1e26`, 썸 `#363642`)
+
+### 2.9.3 (2026-06-30) — 타이틀 바 다크 테마
+
+- `WpfDarkTheme` — DWM `USE_IMMERSIVE_DARK_MODE` + Win11 캡션/텍스트/테두리 색 (`#141418`, `#ececf0`)
+- 메인 창·입력 다이얼로그 타이틀 바가 앱 다크 팔레트와 일치
+
+### 2.9.2 (2026-06-30) — 다크 테마 UI
+
+- `AppTheme.cs` / `WpfDarkTheme.cs` — 통일 색상 팔레트, Eto+WPF 1회 스타일 적용
+- 상단 Open/경로/필터 바 리디자인 (`TreeFilterBar`)
+- 트리·즐겨찾기·스플리터·선택 하이라이트 다크 톤
+
+### 2.9.1 (2026-06-30) — → 키 아래 이동 복구
+
+- `TreeNavigation.ShouldExpandOnRightArrow` — 접힌 폴더 Right 시 펼치기 판별
+- 더 내려갈 수 없을 때만 다음 보이는 항목으로 이동 (파일·빈 폴더 포함)
+- 경로 기반 항목 매칭으로 트리 갱신 후에도 동작
+
+### 2.9.0 (2026-06-30) — 즐겨찾기 사용자 폴더
+
+- `FavoritesStore` + `favorites.json` ( `favorites.txt` 자동 마이그레이션)
+- 즐겨찾기 패널 **트리 UI**: 사용자 폴더 생성/이름 변경/삭제 (`+ Folder`, 우클릭)
+- 항목·폴더 **드래그 앤 드롭** 이동 (Windows, `FavoritesTreeDragDrop`)
+- 우클릭 **Move to** 서브메뉴
+- 폴더 선택 시 **Add to favorites** 가 해당 폴더에 추가
+
+### 2.8.9 (2026-06-30) — 즐겨찾기 미리보기
+
+- 즐겨찾기 목록에서 파일 선택 시 `OnSelectionChanged` 호출로 **뷰포트 미리보기** 즉시 갱신
+
+### 2.8.8 (2026-06-30) — 폴더 즐겨찾기
+
+- 트리에서 **폴더** 우클릭 → Add to favorites / Remove from favorites
+- 즐겨찾기 목록에 폴더 아이콘·이름 표시, 클릭 시 해당 폴더로 트리 이동·선택
+- `FavoritePaths.IsDirectory`, `FavoriteFileLocator.FindDirectory`, `FindDirectoryByPath` (GGPK/번들)
 
 ### 2.8.7 (2026-06-30) — 이미지 드래그 이동
 
@@ -136,12 +286,12 @@
 #### 즐겨찾기 · 최근 파일
 
 - **마지막 열 GGPK** — `%AppData%\VisualGGPK3\last.txt` (`RecentFileStore`)
-- **즐겨찾기** — 추가/제거, 드롭다운 이동 (`FavoritesBar`, `FavoriteFilesStore`, `FavoriteFileLocator`, `FavoritePaths`)
+- **즐겨찾기** — `FavoritesPanel`, `FavoritesStore`, `FavoriteFileLocator`, `FavoritePaths`, `FavoriteTreeItems`
 
 #### 키보드
 
 - **Space** — 오디오 / UV 스프라이트 / 영상 재생·일시정지
-- **Right** — 필터 적용 후 보이는 다음 파일 (`TreeNavigation`)
+- **Right** — 접힌 폴더 펼치기; 펼친 폴더는 다음 보이는 항목; 파일은 다음 **파일** (`TryHandleRightArrow`)
 
 #### 로딩 · 상태
 
@@ -166,7 +316,7 @@
 | `Bink2Native.cs` / `Bink2Playback.cs` / `Bink2Locator.cs` | BK2 (Bink) |
 | `UvSequenceGrid.cs` / `SpriteSheetPlayer.cs` / `SpriteSheetPlayerView.cs` | UV 시퀀스 |
 | `LayoutSettingsStore.cs` / `RecentFileStore.cs` | 설정·최근 파일 |
-| `FavoritesBar.cs` / `FavoriteFilesStore.cs` / `FavoriteFileLocator.cs` / `FavoritePaths.cs` | 즐겨찾기 |
+| `FavoritesPanel.cs` / `FavoritesStore.cs` / `FavoriteFileLocator.cs` / `FavoritePaths.cs` / `FavoriteTreeItems.cs` | 즐겨찾기 |
 | `TreeNavigation.cs` | 트리 키보드 이동 |
 | `LoadStatusReport.cs` | 로드 상태 텍스트 |
 

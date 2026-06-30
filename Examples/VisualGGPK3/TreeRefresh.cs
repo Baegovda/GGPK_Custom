@@ -17,16 +17,30 @@ internal static class TreeRefresh {
 
 		InvalidateFilterCacheDeep(root);
 		CollapseEmptyExpanded(root);
-		RefreshExpandedDirectories(tree, root);
 
+		Application.Instance.AsyncInvoke(() => {
+			RefreshInitializedBranches(tree, root);
 #pragma warning disable CS0618
-		if (selected is not null)
-			tree.SelectedItem = selected;
+			if (selected is not null)
+				tree.SelectedItem = selected;
 #pragma warning restore CS0618
-		if (multiSelected is { Length: > 0 })
-			TreeMultiSelection.Get(tree)?.RestoreSelection(multiSelected);
-		else
-			TreeMultiSelection.Get(tree)?.RefreshVisuals();
+			if (multiSelected is { Length: > 0 })
+				TreeMultiSelection.Get(tree)?.RestoreSelection(multiSelected);
+			else
+				TreeMultiSelection.Get(tree)?.RefreshVisuals();
+		});
+	}
+
+	private static void RefreshInitializedBranches(TreeView tree, DirectoryTreeItem dir) {
+#pragma warning disable CS0618
+		tree.RefreshItem(dir);
+#pragma warning restore CS0618
+		if (!dir.Initialized)
+			return;
+		foreach (var child in dir.ChildItems) {
+			if (child is DirectoryTreeItem sub)
+				RefreshInitializedBranches(tree, sub);
+		}
 	}
 
 	public static void RefreshExpandedDirectories(TreeView tree, DirectoryTreeItem dir) {

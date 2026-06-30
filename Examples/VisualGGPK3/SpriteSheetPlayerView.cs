@@ -32,6 +32,10 @@ internal sealed class SpriteSheetPlayerView : Panel {
 	private bool seekDragging;
 
 	public SpriteSheetPlayerView() {
+		AppTheme.StyleButton(playPauseButton, ThemeButtonVariant.Primary);
+		AppTheme.StyleButton(stopButton, ThemeButtonVariant.Ghost);
+		AppTheme.StyleSlider(frameSlider);
+
 		playPauseButton.Click += (_, _) => player.TogglePlayPause();
 		stopButton.Click += (_, _) => player.Stop();
 		frameSlider.ValueChanged += (_, _) => OnFrameSliderChanged();
@@ -77,6 +81,8 @@ internal sealed class SpriteSheetPlayerView : Panel {
 		Visible = true;
 		if (player.CurrentFrame is not null)
 			FrameChanged?.Invoke(player.CurrentFrame);
+		if (player.FrameCount > 1)
+			player.Play();
 		return true;
 	}
 
@@ -91,6 +97,10 @@ internal sealed class SpriteSheetPlayerView : Panel {
 	}
 
 	public void TogglePlayPause() => player.TogglePlayPause();
+
+	public void Pause() => player.Pause();
+
+	public Bitmap? CurrentFrame => player.CurrentFrame;
 
 	public bool IsActive => player.IsActive;
 

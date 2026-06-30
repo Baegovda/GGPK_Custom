@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 
+using Eto.Forms;
+
 using LibGGPK3;
 using LibGGPK3.Records;
 
@@ -9,7 +11,13 @@ using Index = LibBundle3.Index;
 namespace VisualGGPK3;
 
 internal static class FavoriteFileLocator {
-	public static FileTreeItem? Find(string path, Index? index, GGPK? ggpk, GGPKDirectoryTreeItem? ggpkRoot, BundleDirectoryTreeItem? bundleRoot) {
+	public static ITreeItem? Find(string path, Index? index, GGPK? ggpk, GGPKDirectoryTreeItem? ggpkRoot, BundleDirectoryTreeItem? bundleRoot) {
+		if (FavoritePaths.IsDirectory(path))
+			return FindDirectory(path, ggpk, ggpkRoot, bundleRoot);
+		return FindFile(path, index, ggpk, ggpkRoot, bundleRoot);
+	}
+
+	public static FileTreeItem? FindFile(string path, Index? index, GGPK? ggpk, GGPKDirectoryTreeItem? ggpkRoot, BundleDirectoryTreeItem? bundleRoot) {
 		path = FavoritePaths.Normalize(path);
 		if (index is not null && index.TryGetFile(path, out _) && bundleRoot is not null) {
 			var bundleFile = bundleRoot.FindFileByPath(path);
@@ -24,11 +32,39 @@ internal static class FavoriteFileLocator {
 		return null;
 	}
 
+	public static DirectoryTreeItem? FindDirectory(string path, GGPK? ggpk, GGPKDirectoryTreeItem? ggpkRoot, BundleDirectoryTreeItem? bundleRoot) {
+		var lookup = FavoritePaths.DirectoryLookupPath(path);
+		if (ggpk is not null && ggpkRoot is not null && ggpk.Root.TryFindNode(lookup, out var node) && node is DirectoryRecord)
+			return ggpkRoot.FindDirectoryByPath(lookup);
+		if (bundleRoot is not null)
+			return bundleRoot.FindDirectoryByPath(lookup);
+		return null;
+	}
+
+	public static void ExpandTo(ITreeItem item) {
+		switch (item) {
+			case FileTreeItem file:
+				ExpandTo(file);
+				break;
+			case DirectoryTreeItem dir:
+				ExpandToDirectory(dir);
+				break;
+		}
+	}
+
 	public static void ExpandTo(FileTreeItem file) {
 		var chain = new List<DirectoryTreeItem>();
 		for (var dir = file.Parent; dir is not null; dir = dir.Parent)
 			chain.Add(dir);
 		for (var i = chain.Count - 1; i >= 0; i--)
 			chain[i].Expanded = true;
+	}
+
+	public static void ExpandToDirectory(DirectoryTreeItem dir) {
+		var chain = new List<DirectoryTreeItem>();
+		for (var d = dir; d.Parent is not null; d = d.Parent)
+			chain.Insert(0, d);
+		foreach (var d in chain)
+			d.Expanded = true;
 	}
 }

@@ -13,6 +13,12 @@ internal sealed class MediaPreviewPanel : Panel {
 	private const double AutoHideSeconds = 5.0;
 	private const int OverlayHeaderHeight = 28;
 	private const int SpriteControlsHeight = 36;
+	private const int OverlayMaxWidth = 300;
+	private const int StatusOverlayMaxWidth = 380;
+	private const int OverlayInfoMinHeight = 36;
+	private const int OverlayInfoMaxHeight = 92;
+	private const int StatusOverlayMaxHeight = 260;
+	private const int OverlayLineHeight = 16;
 
 	private readonly PixelLayout pixelLayout = new();
 	private readonly ZoomableImageView imageView = new();
@@ -25,12 +31,19 @@ internal sealed class MediaPreviewPanel : Panel {
 		Visible = false
 	};
 	private readonly Panel overlayHoverZone = new() {
-		BackgroundColor = Colors.Transparent,
+		// Nearly invisible so WPF still hit-tests the hover zone after auto-hide.
+		BackgroundColor = new Color(0, 0, 0, 0.004f),
 		Visible = false
 	};
 	private readonly CheckBox autoHideCheck = new() {
 		Text = "Auto hide",
 		TextColor = Colors.White
+	};
+	private readonly Button viewOriginalButton = new() {
+		Text = "View original",
+		Width = 104,
+		Visible = false,
+		ToolTip = "Show the full sprite sheet atlas"
 	};
 	private readonly TextArea infoText = new() {
 		ReadOnly = true,
@@ -46,32 +59,49 @@ internal sealed class MediaPreviewPanel : Panel {
 	private bool statusMode;
 	private bool imageInfoMode;
 	private bool overlayAutoHidden;
+	private bool viewingOriginalAtlas;
 	private bool suppressAutoHideEvents;
 	private Size lastOverlaySize;
 	private Point lastOverlayPosition;
 	private Bitmap? imageSourceBitmap;
+	private readonly Panel overlayHeader;
 
 	public MediaPreviewPanel() {
+		viewOriginalButton.Click += (_, _) => ToggleOriginalView();
+		AppTheme.StyleButton(viewOriginalButton, ThemeButtonVariant.Ghost);
+		viewOriginalButton.TextColor = Colors.White;
+
 		var header = new StackLayout {
 			Orientation = Orientation.Horizontal,
 			Spacing = 4,
 			Items = {
+				viewOriginalButton,
 				new StackLayoutItem(new Panel(), expand: true),
 				autoHideCheck
 			}
 		};
-		var overlayLayout = new DynamicLayout { Spacing = new Size(4, 4) };
-		overlayLayout.AddRow(header);
-		overlayLayout.AddRow(spritePlayerView);
-		overlayLayout.AddRow(infoText);
+		var overlayHeader = new Panel { Content = header, Height = OverlayHeaderHeight };
+		var overlayLayout = new StackLayout {
+			Orientation = Orientation.Vertical,
+			Spacing = 4,
+			Items = {
+				overlayHeader,
+				spritePlayerView,
+				infoText
+			}
+		};
 		overlayBox.Content = overlayLayout;
+		this.overlayHeader = overlayHeader;
 
 		spritePlayerView.FrameChanged += OnSpriteFrameChanged;
 
 		autoHideCheck.CheckedChanged += (_, _) => OnAutoHideCheckChanged();
 		overlayBox.MouseEnter += (_, _) => ScheduleAutoHide();
 		overlayBox.MouseMove += (_, _) => ScheduleAutoHide();
-		overlayHoverZone.MouseEnter += (_, _) => RevealInfoOverlay();
+		overlayHoverZone.MouseEnter += (_, _) => TryRevealInfoOverlayFromHover();
+		overlayHoverZone.MouseMove += (_, _) => TryRevealInfoOverlayFromHover();
+		MouseMove += OnOverlayHoverProbe;
+		imageView.MouseMove += OnOverlayHoverProbe;
 
 		autoHideTimer = new UITimer((_, _) => HideInfoOverlay()) { Interval = AutoHideSeconds };
 
@@ -110,6 +140,9 @@ internal sealed class MediaPreviewPanel : Panel {
 		audioMode = false;
 		videoMode = false;
 		spriteMode = false;
+		viewingOriginalAtlas = false;
+		viewOriginalButton.Visible = false;
+		overlayHeader.Visible = false;
 		overlayAutoHidden = false;
 		audioPlayerView.Visible = false;
 		videoPlayerView.Visible = false;
@@ -143,11 +176,17 @@ internal sealed class MediaPreviewPanel : Panel {
 
 		if (spritePlayerView.TryLoad(bitmap, fileName, path)) {
 			spriteMode = true;
+			viewingOriginalAtlas = false;
+			viewOriginalButton.Text = "View original";
+			viewOriginalButton.Visible = true;
 		} else {
 			spriteMode = false;
+			viewingOriginalAtlas = false;
+			viewOriginalButton.Visible = false;
 			imageView.Image = bitmap;
 		}
 
+		overlayHeader.Visible = true;
 		infoText.Text = info;
 		overlayBox.Visible = true;
 		Relayout();
@@ -250,6 +289,24 @@ internal sealed class MediaPreviewPanel : Panel {
 	private void UnloadSprite() {
 		spritePlayerView.Unload();
 		spriteMode = false;
+		viewingOriginalAtlas = false;
+		viewOriginalButton.Visible = false;
+	}
+
+	private void ToggleOriginalView() {
+		if (!spriteMode || imageSourceBitmap is null)
+			return;
+		viewingOriginalAtlas = !viewingOriginalAtlas;
+		viewOriginalButton.Text = viewingOriginalAtlas ? "View sequence" : "View original";
+		if (viewingOriginalAtlas) {
+			spritePlayerView.Pause();
+			imageView.Image = imageSourceBitmap;
+		} else if (spritePlayerView.CurrentFrame is { } frame) {
+			imageView.Image = frame;
+		}
+		imageView.InvalidateImage();
+		RevealInfoOverlay();
+		ScheduleAutoHide();
 	}
 
 	private void ReleaseImageAssets() {
@@ -260,6 +317,8 @@ internal sealed class MediaPreviewPanel : Panel {
 	}
 
 	private void OnSpriteFrameChanged(Bitmap frame) {
+		if (viewingOriginalAtlas)
+			return;
 		imageView.Image = frame;
 		imageView.InvalidateImage();
 	}
@@ -295,6 +354,7 @@ internal sealed class MediaPreviewPanel : Panel {
 		overlayBox.Visible = false;
 		overlayHoverZone.Visible = true;
 		Relayout();
+		ProbeMouseForOverlayReveal();
 	}
 
 	private void RevealInfoOverlay() {
@@ -305,6 +365,39 @@ internal sealed class MediaPreviewPanel : Panel {
 		overlayHoverZone.Visible = false;
 		Relayout();
 		ScheduleAutoHide();
+	}
+
+	private void TryRevealInfoOverlayFromHover() {
+		if (!overlayAutoHidden || !imageInfoMode || !AutoHideEnabled)
+			return;
+		RevealInfoOverlay();
+	}
+
+	private void OnOverlayHoverProbe(object? sender, MouseEventArgs e) {
+		if (!overlayAutoHidden || !imageInfoMode || !AutoHideEnabled)
+			return;
+		var point = Point.Round(e.Location);
+		if (sender is Control { Parent: not null } source && !ReferenceEquals(source, this)) {
+			var screen = source.PointToScreen(point);
+			point = Point.Round(PointFromScreen(screen));
+		}
+		if (IsPointInOverlayHoverZone(point))
+			RevealInfoOverlay();
+	}
+
+	private void ProbeMouseForOverlayReveal() {
+		if (!overlayAutoHidden || !imageInfoMode || !AutoHideEnabled)
+			return;
+		var local = Point.Round(PointFromScreen(Mouse.Position));
+		if (IsPointInOverlayHoverZone(local))
+			RevealInfoOverlay();
+	}
+
+	private bool IsPointInOverlayHoverZone(Point point) {
+		if (lastOverlaySize.Width <= 0 || lastOverlaySize.Height <= 0)
+			return false;
+		var zone = new RectangleF(lastOverlayPosition, lastOverlaySize);
+		return zone.Contains(point);
 	}
 
 	private void Relayout() {
@@ -322,18 +415,23 @@ internal sealed class MediaPreviewPanel : Panel {
 
 		if (audioMode && audioPlayerView.Visible) {
 			var playerWidth = Math.Clamp(Width - 48, 420, 640);
-			var playerHeight = Math.Clamp(audioPlayerView.MinimumSize.Height, 168, Height - 48);
+			var playerHeight = Math.Clamp(audioPlayerView.MinimumSize.Height, 220, Height - 48);
 			audioPlayerView.Size = new Size(playerWidth, playerHeight);
 			pixelLayout.Move(audioPlayerView, (Width - playerWidth) / 2, (Height - playerHeight) / 2);
 			return;
 		}
 
 		if (statusMode && overlayBox.Visible) {
-			var statusWidth = Math.Min(Width - OverlayMargin * 2, 720);
-			var statusHeight = Height - OverlayMargin * 2;
-			overlayBox.Size = new Size(statusWidth, statusHeight);
-			infoText.Height = Math.Max(24, statusHeight - overlayBox.Padding.Vertical - OverlayHeaderHeight);
-			pixelLayout.Move(overlayBox, OverlayMargin, OverlayMargin);
+			spritePlayerView.Visible = false;
+			var statusWidth = Math.Min(Width - OverlayMargin * 2, StatusOverlayMaxWidth);
+			var infoHeight = Math.Clamp(MeasureInfoHeight(statusWidth), OverlayInfoMinHeight, StatusOverlayMaxHeight);
+			var statusOverlayHeight = infoHeight + overlayBox.Padding.Vertical;
+			lastOverlaySize = new Size(statusWidth, statusOverlayHeight);
+			lastOverlayPosition = new Point(OverlayMargin, Height - statusOverlayHeight - OverlayMargin);
+			overlayBox.Size = lastOverlaySize;
+			infoText.Height = infoHeight;
+			overlayHoverZone.Visible = false;
+			pixelLayout.Move(overlayBox, lastOverlayPosition.X, lastOverlayPosition.Y);
 			return;
 		}
 
@@ -353,25 +451,34 @@ internal sealed class MediaPreviewPanel : Panel {
 		}
 
 		overlayBox.Size = lastOverlaySize;
-		var spriteHeight = spritePlayerView.Visible ? SpriteControlsHeight : 0;
-		infoText.Height = Math.Max(24, overlayHeight - spriteHeight - overlayBox.Padding.Vertical - OverlayHeaderHeight);
+		var spriteHeight = spriteMode && spritePlayerView.Visible ? SpriteControlsHeight : 0;
+		spritePlayerView.Height = spriteHeight;
+		spritePlayerView.Visible = spriteMode;
+		infoText.Height = Math.Max(OverlayInfoMinHeight, overlayHeight - spriteHeight - overlayBox.Padding.Vertical - OverlayHeaderHeight);
 		overlayBox.Visible = true;
 		overlayHoverZone.Visible = false;
 		pixelLayout.Move(overlayBox, lastOverlayPosition.X, lastOverlayPosition.Y);
 	}
 
 	private void ComputeImageOverlaySize(out int overlayWidth, out int overlayHeight) {
-		overlayWidth = Math.Min(Width - OverlayMargin * 2, 460);
-		var spriteHeight = spritePlayerView.Visible ? SpriteControlsHeight : 0;
-		var infoHeight = Math.Clamp(MeasureInfoHeight(overlayWidth), 48, Math.Max(48, Height / 3));
-		overlayHeight = Math.Min(Height - OverlayMargin * 2, infoHeight + overlayBox.Padding.Vertical + OverlayHeaderHeight + spriteHeight);
+		overlayWidth = Math.Min(Width - OverlayMargin * 2, OverlayMaxWidth);
+		var spriteHeight = spriteMode && spritePlayerView.Visible ? SpriteControlsHeight : 0;
+		var infoHeight = Math.Clamp(MeasureInfoHeight(overlayWidth), OverlayInfoMinHeight, OverlayInfoMaxHeight);
+		overlayHeight = infoHeight + overlayBox.Padding.Vertical + OverlayHeaderHeight + spriteHeight;
 	}
 
 	private int MeasureInfoHeight(int width) {
 		if (string.IsNullOrEmpty(infoText.Text))
-			return 48;
-		var lines = infoText.Text.Split('\n').Length;
-		return Math.Max(48, lines * 18 + 12);
+			return OverlayInfoMinHeight;
+
+		var textWidth = Math.Max(120, width - overlayBox.Padding.Horizontal);
+		var charsPerLine = Math.Max(18, textWidth / 7);
+		var totalLines = 0;
+		foreach (var line in infoText.Text.Split('\n')) {
+			var length = string.IsNullOrEmpty(line) ? 1 : line.Length;
+			totalLines += (length + charsPerLine - 1) / charsPerLine;
+		}
+		return Math.Max(OverlayInfoMinHeight, totalLines * OverlayLineHeight + 8);
 	}
 
 	private static string BuildVideoDetails(FileTreeItem fileItem, ReadOnlyMemory<byte> data) {

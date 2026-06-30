@@ -45,6 +45,8 @@ public sealed class MainWindow : Form {
 	private string? imageName;
 	private ITreeItem? clickedItem;
 	private bool firstSelected;
+	private readonly Button updateButton;
+	private Version? pendingUpdateVersion;
 
 	public MainWindow(string? path = null) {
 #if Mac
@@ -78,12 +80,15 @@ public sealed class MainWindow : Form {
 		}
 		WindowsFix(GGPKTree);
 		WindowsFix(BundleTree);
+		WpfDarkTheme.StyleTreeView(GGPKTree);
+		WpfDarkTheme.StyleTreeView(BundleTree);
 		WindowsHookTreeKeys(GGPKTree);
 		WindowsHookTreeKeys(BundleTree);
 		// Virtualizing
 		var gtext = ((Eto.Wpf.Forms.Controls.GridViewHandler)DatPanel.Handler).Control; // EtoDataGrid
 		gtext.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
 		gtext.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
+		WpfDarkTheme.StyleGridView(DatPanel);
 #endif
 		TreeMultiSelection.Enable(GGPKTree);
 		TreeMultiSelection.Enable(BundleTree);
@@ -134,14 +139,31 @@ public sealed class MainWindow : Form {
 				preferredFavoritesSplitter = TreesLayout.Position;
 		};
 
+		AppTheme.ApplyForm(this);
+#if Windows
+		Load += (_, _) => AppTheme.ApplyForm(this);
+#endif
+		AppTheme.StyleTextArea(TextPanel);
+		AppTheme.StyleSplitter(MainLayout);
+		AppTheme.StyleSplitter(RightLayout);
+		AppTheme.StyleSplitter(TreesLayout);
+		AppTheme.ApplyTreeHost(GGPKTree);
+		AppTheme.ApplyTreeHost(BundleTree);
+		FavoritesPanel.ApplyTheme();
+
 		var loading = new TreeItemCollection() {
 			new TreeItem() { Text = "Loading . . ." }
 		};
 		GGPKTree.DataStore = loading;
 		BundleTree.DataStore = loading;
 
-		var openButton = new Button { Text = "Open" };
+		var openButton = new Button { Text = "Open", Width = AppTheme.ToolbarButtonWidth };
 		openButton.Click += OnOpenClicked;
+		AppTheme.StyleButton(openButton, ThemeButtonVariant.Primary);
+		updateButton = new Button { Text = "Update", Width = AppTheme.ToolbarButtonWidth };
+		updateButton.Click += OnUpdateClicked;
+		AppTheme.StyleButton(updateButton, ThemeButtonVariant.Secondary);
+		AppTheme.StyleTextInput(PathBox, readOnly: true);
 		FilterBar.FiltersChanged += (_, _) => {
 			DiagnosticLog.User("filter_changed", new Dictionary<string, object?> {
 				["show"] = FileSearchFilter.Text,
@@ -154,20 +176,25 @@ public sealed class MainWindow : Form {
 		FavoritesPanel.FavoriteSelected += (_, path) => NavigateToFavorite(path);
 		FavoritesPanel.FavoriteRemoveRequested += (_, path) => RemoveFavorite(path);
 
-		var topBar = new DynamicLayout { Padding = new Padding(5), Spacing = new Size(5, 5) };
-		topBar.BeginHorizontal();
-		topBar.Add(openButton);
-		topBar.Add(PathBox, xscale: true);
-		topBar.EndHorizontal();
-		topBar.Add(FilterBar, xscale: true);
-
-		Content = new TableLayout {
-			Spacing = new Size(0, 0),
-			Rows = {
-				new TableRow(topBar),
-				new TableRow(TreesLayout) { ScaleHeight = true }
-			}
+		var topBar = new DynamicLayout {
+			Padding = new Padding(10, 8, 10, 6),
+			Spacing = new Size(0, 8)
 		};
+		topBar.BeginHorizontal();
+		topBar.Add(openButton, yscale: false);
+		topBar.Add(updateButton, yscale: false);
+		topBar.Add(PathBox, xscale: true, yscale: false);
+		topBar.EndHorizontal();
+		topBar.Add(FilterBar, xscale: true, yscale: false);
+		AppTheme.ApplyPanel(FilterBar, raised: true);
+
+		var root = new DynamicLayout {
+			Spacing = Size.Empty,
+			BackgroundColor = AppTheme.WindowBg
+		};
+		root.Add(topBar, xscale: true, yscale: false);
+		root.Add(TreesLayout, xscale: true, yscale: true);
+		Content = root;
 
 		GGPKTree.MouseUp += (s, e) => {
 			if (e.Buttons == MouseButtons.Alternate && GGPKTree.GetNodeAt(e.Location) is ITreeItem item)
@@ -211,25 +238,7 @@ public sealed class MainWindow : Form {
 			DiagnosticLog.LogSessionEnd("window_closed");
 		};
 
-		Task.Run(async () => {
-			try {
-				using var http = new HttpClient() { DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher };
-				var r = await http.GetStringAsync("https://raw.githubusercontent.com/aianlinb/LibGGPK3/main/.github/Version.txt");
-				var array = r.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-				if (array.Length != 0 && !firstSelected && Version.TryParse(array[0], out var latest) && version < latest)
-					_ = Application.Instance.InvokeAsync(() => TextPanel.Text = $"Found new version: v{latest},  Download here: https://github.com/aianlinb/LibGGPK3/releases");
-				if (array.Length > 1 && Version.TryParse(array[1], out var minimum) && version < minimum) {
-					_ = Application.Instance.InvokeAsync(() => {
-						if (MessageBox.Show(this, "Critical update found! Please download the latest version to continue.", MessageBoxButtons.OKCancel, MessageBoxType.Warning) == DialogResult.Ok)
-							Process.Start(new ProcessStartInfo("https://github.com/aianlinb/LibGGPK3/releases") { UseShellExecute = true });
-						Close();
-						Application.Instance.Quit();
-					});
-				}
-			} catch (Exception ex) {
-				Debug.WriteLine(ex.GetNameAndMessage());
-			}
-		});
+		_ = CheckForUpdatesInBackgroundAsync(version);
 
 		async void OnLoadComplete(object? sender, EventArgs e) {
 			LoadComplete -= OnLoadComplete;
@@ -255,6 +264,133 @@ public sealed class MainWindow : Form {
 		}
 	}
 
+	private async Task CheckForUpdatesInBackgroundAsync(Version currentVersion) {
+		try {
+			var info = await AppUpdater.CheckAsync().ConfigureAwait(false);
+			if (info is not UpdateInfo resolved)
+				return;
+
+			if (resolved.Minimum is Version minimum && currentVersion < minimum) {
+				await Application.Instance.InvokeAsync(() => {
+					if (MessageBox.Show(this,
+							$"Critical update required (minimum v{AppUpdater.FormatVersion(minimum)}).\nInstall the latest version now?",
+							MessageBoxButtons.YesNo,
+							MessageBoxType.Warning) == DialogResult.Yes)
+						_ = RunUpdateAsync(resolved, prompt: false);
+					else {
+						Close();
+						Application.Instance.Quit();
+					}
+				});
+				return;
+			}
+
+			if (AppUpdater.IsNewer(resolved.Latest)) {
+				pendingUpdateVersion = resolved.Latest;
+				await Application.Instance.InvokeAsync(RefreshUpdateButton);
+			}
+		} catch (Exception ex) {
+			Debug.WriteLine(ex.GetNameAndMessage());
+		}
+	}
+
+	private void RefreshUpdateButton() {
+		if (pendingUpdateVersion is Version latest) {
+			updateButton.Text = $"Update v{AppUpdater.FormatVersion(latest)}";
+			AppTheme.StyleButton(updateButton, ThemeButtonVariant.Primary);
+		} else {
+			updateButton.Text = "Update";
+			AppTheme.StyleButton(updateButton, ThemeButtonVariant.Secondary);
+		}
+	}
+
+	private async void OnUpdateClicked(object? sender, EventArgs e) {
+		updateButton.Enabled = false;
+		try {
+			UpdateInfo info;
+			try {
+				if (await AppUpdater.CheckAsync().ConfigureAwait(true) is not UpdateInfo resolved) {
+					MessageBox.Show(this, "Could not check for updates.", MessageBoxButtons.OK, MessageBoxType.Error);
+					return;
+				}
+				info = resolved;
+			} catch (Exception ex) {
+				MessageBox.Show(this, $"Could not check for updates.\n{ex.Message}", MessageBoxButtons.OK, MessageBoxType.Error);
+				return;
+			}
+
+			if (!AppUpdater.IsNewer(info.Latest)) {
+				MessageBox.Show(this, $"You already have the latest version (v{AppUpdater.FormatVersion(AppUpdater.CurrentVersion)}).", MessageBoxButtons.OK, MessageBoxType.Information);
+				pendingUpdateVersion = null;
+				RefreshUpdateButton();
+				return;
+			}
+
+			pendingUpdateVersion = info.Latest;
+			RefreshUpdateButton();
+			await RunUpdateAsync(info, prompt: true);
+		} finally {
+			updateButton.Enabled = true;
+		}
+	}
+
+	private Task RunUpdateAsync(UpdateInfo info, bool prompt) {
+		if (prompt) {
+			if (string.IsNullOrEmpty(info.DownloadUrl)) {
+				if (MessageBox.Show(this,
+						$"Version v{AppUpdater.FormatVersion(info.Latest)} is available, but no install package was published yet.\nOpen the releases page in your browser?",
+						MessageBoxButtons.YesNo,
+						MessageBoxType.Question) != DialogResult.Yes)
+					return Task.CompletedTask;
+			} else if (MessageBox.Show(this,
+					$"Download and install VisualGGPK3 v{AppUpdater.FormatVersion(info.Latest)}?\nThe app will close and restart automatically.",
+					MessageBoxButtons.OKCancel,
+					MessageBoxType.Question) != DialogResult.Ok)
+				return Task.CompletedTask;
+		}
+
+		if (string.IsNullOrEmpty(info.DownloadUrl)) {
+			Process.Start(new ProcessStartInfo(AppUpdater.ReleasesUrl) { UseShellExecute = true });
+			return Task.CompletedTask;
+		}
+
+		if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+			MessageBox.Show(this, "Automatic install is only supported on Windows. Opening the releases page.", MessageBoxButtons.OK, MessageBoxType.Information);
+			Process.Start(new ProcessStartInfo(AppUpdater.ReleasesUrl) { UseShellExecute = true });
+			return Task.CompletedTask;
+		}
+
+		using var progressDialog = new UpdateProgressDialog();
+		using var cts = new CancellationTokenSource();
+		progressDialog.CancelRequested += () => cts.Cancel();
+		var success = false;
+
+		progressDialog.Shown += async (_, _) => {
+			try {
+				await AppUpdater.DownloadAndApplyAsync(
+					info,
+					new Progress<UpdateProgress>(progressDialog.Report),
+					cts.Token).ConfigureAwait(true);
+				success = true;
+				progressDialog.SetComplete("Update ready. Restarting…");
+				await Task.Delay(600).ConfigureAwait(true);
+				progressDialog.Result = DialogResult.Ok;
+				progressDialog.Close();
+			} catch (OperationCanceledException) {
+				progressDialog.SetError("Update cancelled.");
+			} catch (Exception ex) {
+				progressDialog.SetError(ex.Message);
+			}
+		};
+
+		progressDialog.ShowModal(this);
+		if (success) {
+			Close();
+			Application.Instance.Quit();
+		}
+		return Task.CompletedTask;
+	}
+
 	private static OpenFileDialog CreateOpenFileDialog() => new() {
 		FileName = "Content.ggpk",
 		Filters = {
@@ -277,6 +413,29 @@ public sealed class MainWindow : Form {
 
 		DiagnosticLog.User("open_archive", new Dictionary<string, object?> { ["path"] = path });
 
+		Application.Instance.Invoke(() => BeginArchiveLoadUi(path));
+
+		ArchiveLoadResult loadResult;
+		if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+			loadResult = await Task.Run(() => LoadBinArchive(path));
+		else
+			loadResult = await Task.Run(() => LoadGgpkArchive(path));
+
+		BundleDirectoryTreeItem? bundleRoot = null;
+		if (loadResult.Index is not null && loadResult.Failed != loadResult.Index.Files.Count) {
+			var index = loadResult.Index;
+			bundleRoot = await Task.Run(() => (BundleDirectoryTreeItem)index.BuildTree(
+				BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree),
+				BundleFileTreeItem.CreateInstance,
+				true));
+		}
+
+		var bundles = bundleRoot;
+		Application.Instance.Invoke(() => FinishArchiveLoadUi(path, loadResult, bundles));
+		}, new Dictionary<string, object?> { ["path"] = path });
+	}
+
+	private void BeginArchiveLoadUi(string path) {
 		PathBox.Text = Path.GetFullPath(path);
 		PreviewPanel.Clear();
 		FilterBar.ClearPath(notify: false);
@@ -302,58 +461,100 @@ public sealed class MainWindow : Form {
 		GGPKTree.DataStore = loading;
 		BundleTree.DataStore = loading;
 		ShowLoadStatus("Loading…");
+	}
 
-		int failed;
-		if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)) {
-			failed = await Task.Run(() => {
-				Index = new(path, false);
-				return Index.ParsePaths();
-			});
+	private sealed class ArchiveLoadResult {
+		public int Failed;
+		public GGPK? Ggpk;
+		public LibBundle3.Index? Index;
+		public bool BinOnly;
+		public string? DialogTitle;
+		public string? DialogMessage;
+		public MessageBoxType DialogType;
+	}
+
+	private static ArchiveLoadResult LoadBinArchive(string path) {
+		var index = new LibBundle3.Index(path, false);
+		return new ArchiveLoadResult {
+			Failed = index.ParsePaths(),
+			Index = index,
+			BinOnly = true
+		};
+	}
+
+	private ArchiveLoadResult LoadGgpkArchive(string path) {
+		try {
+			var ggpk = new BundledGGPK(path, false);
+			return new ArchiveLoadResult {
+				Failed = ggpk.Index.ParsePaths(),
+				Ggpk = ggpk,
+				Index = ggpk.Index
+			};
+		} catch (Exception ex) {
+			if (ex is DllNotFoundException { Message: var dllMsg }
+				&& dllMsg.Contains("oo2core", StringComparison.OrdinalIgnoreCase)) {
+				return new ArchiveLoadResult {
+					Failed = 0,
+					Ggpk = new GGPK(path),
+					DialogTitle = "oo2core 없음",
+					DialogMessage =
+						"Bundled GGPK (PoE2 등)을 읽으려면 oo2core.dll 이 필요합니다.\r\n\r\n" +
+						"1. 저장소 루트에서 setup.ps1 실행\r\n" +
+						"2. Run-VisualGGPK3.cmd 로 실행 (bin\\Debug\\)\r\n\r\n" +
+						$"상세: {dllMsg}",
+					DialogType = MessageBoxType.Error
+				};
+			}
+			if (ex is FileNotFoundException or DirectoryNotFoundException) {
+				return new ArchiveLoadResult {
+					Failed = 0,
+					Ggpk = new GGPK(path),
+					DialogTitle = "Warning",
+					DialogMessage = ex.GetNameAndMessage(),
+					DialogType = MessageBoxType.Warning
+				};
+			}
+			return new ArchiveLoadResult {
+				Failed = 0,
+				Ggpk = new GGPK(path),
+				DialogTitle = "Error",
+				DialogMessage = ex.ToString(),
+				DialogType = MessageBoxType.Error
+			};
+		}
+	}
+
+	private void FinishArchiveLoadUi(string path, ArchiveLoadResult loadResult, BundleDirectoryTreeItem? bundles) {
+		if (loadResult.DialogMessage is not null)
+			MessageBox.Show(this, loadResult.DialogMessage, loadResult.DialogTitle ?? "Error", loadResult.DialogType);
+
+		Ggpk = loadResult.Ggpk;
+		Index = loadResult.Index;
+
+		if (loadResult.BinOnly) {
 			GGPKTree.DataStore = null;
 			GGPKTree.Visible = false;
 			GGPKTree.Enabled = false;
 			MainLayout.Panel1MinimumSize = 0;
 			MainLayout.Position = 0;
 		} else {
-			failed = await Task.Run(() => {
-				try {
-					var ggpk = new BundledGGPK(path, false);
-					Ggpk = ggpk;
-					Index = ggpk.Index;
-					return Index.ParsePaths();
-				} catch (Exception ex) {
-					if (ex is FileNotFoundException or DirectoryNotFoundException)
-						Application.Instance.AsyncInvoke(() =>
-							MessageBox.Show(this, ex.GetNameAndMessage(), "Warning", MessageBoxType.Warning));
-					else
-						Application.Instance.Invoke(() =>
-							MessageBox.Show(this, ex.ToString(), "Error", MessageBoxType.Error));
-					Ggpk = new GGPK(path);
-					return 0;
-				}
-			});
 			GGPKTree.DataStore = new GGPKDirectoryTreeItem(Ggpk!.Root, null, GGPKTree) {
 				Expanded = true
 			};
 		}
 
-		var buildTreeTask = Index is null || failed == Index.Files.Count ? Task.FromResult<BundleDirectoryTreeItem>(null!) :
-			Task.Run(() => (BundleDirectoryTreeItem)Index.BuildTree(BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree), BundleFileTreeItem.CreateInstance, true));
-
-		var bundles = await buildTreeTask;
 		if (bundles is not null)
 			bundles.Expanded = true;
 		BundleTree.DataStore = bundles;
 
 		string? extraNote = null;
-		if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+		if (loadResult.BinOnly)
 			extraNote = "GGPK tree hidden (opened _.index.bin only).";
-		else if (failed != 0 && Index is not null)
-			extraNote = $"Warning: {failed} directory path(s) could not be matched. See details below.";
-		ShowLoadStatus(LoadStatusReport.Build(PathBox.Text, Index, failed, extraNote));
+		else if (loadResult.Failed != 0 && Index is not null)
+			extraNote = $"Warning: {loadResult.Failed} directory path(s) could not be matched. See details below.";
+		ShowLoadStatus(LoadStatusReport.Build(PathBox.Text, Index, loadResult.Failed, extraNote));
 		ApplyTreeFilters();
 		RecentFileStore.Save(path);
-		}, new Dictionary<string, object?> { ["path"] = path });
 	}
 
 	private void ShowLoadStatus(string text) {
@@ -370,33 +571,46 @@ public sealed class MainWindow : Form {
 			new ButtonMenuItem(OnExportDdsClicked) { Text = "Export .dds to .png" }
 		};
 		if (item is FileTreeItem fileItem) {
-			var path = fileItem.GetPath();
-			items.Add(new ButtonMenuItem(OnToggleFavoriteClicked) {
-				Text = FavoriteFilesStore.Contains(path) ? "Remove from favorites" : "Add to favorites"
-			});
+			AddFavoriteMenuItem(items, fileItem.GetPath());
+		} else if (item is DirectoryTreeItem dirItem) {
+			AddFavoriteMenuItem(items, dirItem.GetPath());
 		}
 		new ContextMenu(items).Show(tree);
 	}
 
+	private void AddFavoriteMenuItem(List<MenuItem> items, string path) {
+		items.Add(new ButtonMenuItem(OnToggleFavoriteClicked) {
+			Text = FavoritesStore.Contains(path) ? "Remove from favorites" : "Add to favorites"
+		});
+	}
+
 	private void OnToggleFavoriteClicked(object? sender, EventArgs _) {
+		if (clickedItem is DirectoryTreeItem dirItem) {
+			ToggleFavoritePath(dirItem.GetPath());
+			return;
+		}
 		if (clickedItem is not FileTreeItem)
 			return;
 		var tree = TreeForItem(clickedItem);
 		var files = GetContextFileItems(tree).ToList();
 		if (files.Count == 0)
 			return;
-		foreach (var fileItem in files) {
-			var path = fileItem.GetPath();
-			if (FavoriteFilesStore.Contains(path))
-				FavoriteFilesStore.Remove(path);
-			else
-				FavoriteFilesStore.Add(path);
-		}
+		foreach (var fileItem in files)
+			ToggleFavoritePath(fileItem.GetPath(), refresh: false);
 		FavoritesPanel.RefreshList();
 	}
 
+	private void ToggleFavoritePath(string path, bool refresh = true) {
+		if (FavoritesStore.Contains(path))
+			FavoritesStore.Remove(path);
+		else
+			FavoritesStore.Add(path, FavoritesPanel.GetAddTargetGroupId());
+		if (refresh)
+			FavoritesPanel.RefreshList();
+	}
+
 	private void RemoveFavorite(string path) {
-		FavoriteFilesStore.Remove(path);
+		FavoritesStore.Remove(path);
 		FavoritesPanel.RefreshList();
 	}
 
@@ -405,24 +619,27 @@ public sealed class MainWindow : Form {
 			MessageBox.Show(this, "Open a GGPK or index file first.", "Favorites", MessageBoxType.Information);
 			return;
 		}
+		TreeViewFilter.SetRevealPath(path);
+		ApplyTreeFilters();
+		Application.Instance.AsyncInvoke(() => SelectFavoriteInTree(path));
+	}
+
+	private void SelectFavoriteInTree(string path) {
 		var ggpkRoot = GGPKTree.DataStore as GGPKDirectoryTreeItem;
 		var bundleRoot = BundleTree.DataStore as BundleDirectoryTreeItem;
-		FileTreeItem? file = DiagnosticLog.Measure("favorite", "navigate", () =>
+		var item = DiagnosticLog.Measure("favorite", "navigate", () =>
 			FavoriteFileLocator.Find(path, Index, Ggpk, ggpkRoot, bundleRoot));
-		if (file is null) {
-			MessageBox.Show(this, $"File not found in the current archive:\r\n{path}", "Favorites", MessageBoxType.Warning);
+		if (item is null) {
+			TreeViewFilter.ClearRevealPath();
+			ApplyTreeFilters();
+			MessageBox.Show(this, $"Path not found in the current archive:\r\n{path}", "Favorites", MessageBoxType.Warning);
 			return;
 		}
-		if (TreeViewFilter.IsActive && !TreeViewFilter.MatchesFile(file)) {
-			MessageBox.Show(this,
-				"This favorite is hidden by the active filter. Reset filters to view it.",
-				"Favorites",
-				MessageBoxType.Information);
-		}
-		var tree = file is GGPKFileTreeItem ? GGPKTree : BundleTree;
-		FavoriteFileLocator.ExpandTo(file);
-		tree.SelectedItem = file;
-		TreeMultiSelection.Get(tree)?.SelectSingle(file);
+		var tree = TreeForItem(item);
+		FavoriteFileLocator.ExpandTo(item);
+		tree.SelectedItem = item;
+		TreeMultiSelection.Get(tree)?.SelectSingle(item);
+		OnSelectionChanged(tree, EventArgs.Empty);
 	}
 
 #if !Windows
@@ -451,7 +668,7 @@ public sealed class MainWindow : Form {
 
 	private IEnumerable<FileTreeItem> GetContextFileItems(TreeView tree) {
 		var selected = GetSelectedFileItems(tree).ToList();
-		if (clickedItem is FileTreeItem clicked && selected.Any(f => ReferenceEquals(f, clicked)))
+		if (clickedItem is FileTreeItem clicked && selected.Any(f => TreeItemIdentity.Same(f, clicked)))
 			return selected;
 		if (clickedItem is FileTreeItem one)
 			return [one];
@@ -473,24 +690,42 @@ public sealed class MainWindow : Form {
 			return;
 		if (sender is not TreeView tree)
 			return;
-		if (TrySelectNextVisibleItem(tree))
+		if (TryHandleRightArrow(tree))
 			e.Handled = true;
 	}
 
-	private bool TrySelectNextVisibleItem(TreeView tree) {
+	private bool TryHandleRightArrow(TreeView tree) {
 #pragma warning disable CS0618
-		var selected = tree.SelectedItem;
-#pragma warning restore CS0618
-		if (selected is not FileTreeItem)
+		if (tree.SelectedItem is not ITreeItem selected)
 			return false;
+#pragma warning restore CS0618
 		if (tree.DataStore is not ITreeItem root)
 			return false;
-		var next = TreeNavigation.GetNextVisibleItem(root, selected);
+
+		if (selected is DirectoryTreeItem dir && !dir.Expanded && dir.Expandable) {
+			dir.Expanded = true;
+			return true;
+		}
+
+		var next = selected is FileTreeItem
+			? TreeNavigation.GetNextFileItem(root, selected)
+			: TreeNavigation.GetNextVisibleItem(root, selected);
 		if (next is null)
 			return false;
-		tree.SelectedItem = next;
+		SelectTreeItem(tree, next);
 		return true;
 	}
+
+	private void SelectTreeItem(TreeView tree, ITreeItem item) {
+		if (TreeMultiSelection.Get(tree) is { } ms)
+			ms.SelectSingle(item);
+#pragma warning disable CS0618
+		tree.SelectedItem = item;
+#pragma warning restore CS0618
+		OnSelectionChanged(tree, EventArgs.Empty);
+	}
+
+	private bool TrySelectNextVisibleItem(TreeView tree) => TryHandleRightArrow(tree);
 
 	private void OnPlayKeyDown(object? sender, KeyEventArgs e) {
 		if (e.Key != Keys.Space)

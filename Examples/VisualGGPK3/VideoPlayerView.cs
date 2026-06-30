@@ -79,6 +79,12 @@ internal sealed class VideoPlayerView : Panel {
 		binkFrameView.MinimumSize = new Size(320, 180);
 		binkFrameView.Visible = false;
 
+		AppTheme.StyleButton(playPauseButton, ThemeButtonVariant.Primary);
+		AppTheme.StyleButton(stopButton, ThemeButtonVariant.Ghost);
+		AppTheme.StyleButton(locateBinkButton);
+		AppTheme.StyleSlider(seekSlider);
+		AppTheme.StyleSlider(volumeSlider);
+
 		playPauseButton.Click += (_, _) => TogglePlayPauseCore();
 		stopButton.Click += (_, _) => Stop();
 		locateBinkButton.Click += (_, _) => OnLocateBinkDllClicked();

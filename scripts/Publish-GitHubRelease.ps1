@@ -12,7 +12,8 @@
 param(
 	[string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
 	[string]$Version = '',
-	[switch]$Force
+	[switch]$Force,
+	[switch]$Package
 )
 
 Set-StrictMode -Version Latest
@@ -81,6 +82,19 @@ try {
 	} else {
 		gh release edit $tag --repo $repo --title $title --notes-file $notesFile
 		Write-Host "Updated GitHub Release $tag"
+	}
+
+	if ($Package) {
+		$packageScript = Join-Path $PSScriptRoot 'Package-VisualGGPK3Release.ps1'
+		if (-not (Test-Path -LiteralPath $packageScript)) {
+			throw "Missing $packageScript"
+		}
+		$zipPath = & $packageScript -RepoRoot $RepoRoot
+		if (-not (Test-Path -LiteralPath $zipPath)) {
+			throw "Package script did not produce a zip: $zipPath"
+		}
+		gh release upload $tag $zipPath --repo $repo --clobber
+		Write-Host "Uploaded $(Split-Path -Leaf $zipPath)"
 	}
 
 	Write-Host "Done: https://github.com/$repo/releases/tag/$tag"

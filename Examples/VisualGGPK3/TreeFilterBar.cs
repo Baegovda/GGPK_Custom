@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -8,12 +9,23 @@ using Eto.Forms;
 namespace VisualGGPK3;
 
 internal sealed class TreeFilterBar : Panel {
+	private static readonly (string Key, string Label)[] TypeFilters = [
+		("", "All"),
+		("Images", "Images"),
+		("UvSequence", "UV Seq"),
+		("Text", "Text"),
+		("Data", "Data"),
+		("Audio", "Audio"),
+		("Video", "Video")
+	];
+
 	private readonly TextBox pathBox = new() { PlaceholderText = "Path or filename…" };
 	private readonly TextBox excludeBox = new() { PlaceholderText = "Exclude words (comma or space)…" };
-	private readonly DropDown typeDropDown = new() { Width = 110 };
-	private readonly Button resetButton = new() { Text = "Reset", Enabled = false };
-	private readonly Button exportPngButton = new() { Text = "Export PNGs", Enabled = false };
-	private readonly Label hintLabel = new() { TextColor = Colors.Gray };
+	private readonly Button resetButton = new() { Text = "Reset", Enabled = false, Width = 72 };
+	private readonly Button exportPngButton = new() { Text = "Export PNGs", Enabled = false, Width = 102 };
+	private readonly Label hintLabel = new();
+	private readonly List<(string Key, Button Button)> typeChips = [];
+	private string selectedTypeKey = "";
 	private CancellationTokenSource? debounce;
 	private bool suppressEvents;
 
@@ -21,40 +33,82 @@ internal sealed class TreeFilterBar : Panel {
 	public event EventHandler? ExportFilteredPngsRequested;
 
 	public TreeFilterBar() {
-		typeDropDown.Items.Add(new ListItem { Text = "All types", Key = "" });
-		typeDropDown.Items.Add(new ListItem { Text = "Images", Key = "Images" });
-		typeDropDown.Items.Add(new ListItem { Text = "Text", Key = "Text" });
-		typeDropDown.Items.Add(new ListItem { Text = "Data", Key = "Data" });
-		typeDropDown.Items.Add(new ListItem { Text = "Audio", Key = "Audio" });
-		typeDropDown.Items.Add(new ListItem { Text = "Video", Key = "Video" });
+		foreach (var (key, label) in TypeFilters) {
+			var chip = new Button {
+				Text = label,
+				Width = key == "UvSequence" ? 72 : 64,
+				ToolTip = key.Length == 0 ? "Show all file types" :
+					key == "UvSequence" ? "Show only UV sprite sequences (NxM in file or path name)" :
+					$"Show only {label.ToLowerInvariant()} files"
+			};
+			var filterKey = key;
+			chip.Click += (_, _) => SelectTypeFilter(filterKey);
+			typeChips.Add((key, chip));
+		}
 
 		RestoreSavedFilters();
 
 		pathBox.TextChanged += (_, _) => _ = DebouncedApplyAsync();
 		excludeBox.TextChanged += (_, _) => _ = DebouncedApplyAsync();
-		typeDropDown.SelectedKeyChanged += (_, _) => ApplyFilters();
 		resetButton.Click += (_, _) => Reset();
 		exportPngButton.Click += (_, _) => ExportFilteredPngsRequested?.Invoke(this, EventArgs.Empty);
 
-		var layout = new DynamicLayout { Padding = new Padding(5, 0, 5, 5), Spacing = new Size(6, 4) };
+		AppTheme.StyleTextInput(pathBox);
+		AppTheme.StyleTextInput(excludeBox);
+		AppTheme.StyleButton(exportPngButton);
+		AppTheme.StyleButton(resetButton);
+		AppTheme.StyleHintLabel(hintLabel);
+		UpdateTypeChipStyles();
+
+		var showLabel = AppTheme.CreateFieldLabel("Show");
+		var hideLabel = AppTheme.CreateFieldLabel("Hide");
+		var typeLabel = AppTheme.CreateFieldLabel("Type");
+
+		var chipRowTop = new StackLayout {
+			Orientation = Orientation.Horizontal,
+			Spacing = 4,
+			VerticalContentAlignment = VerticalAlignment.Center
+		};
+		var chipRowBottom = new StackLayout {
+			Orientation = Orientation.Horizontal,
+			Spacing = 4,
+			VerticalContentAlignment = VerticalAlignment.Center
+		};
+		for (var i = 0; i < typeChips.Count; i++) {
+			var target = i < 4 ? chipRowTop : chipRowBottom;
+			target.Items.Add(typeChips[i].Button);
+		}
+		var chipColumn = new StackLayout {
+			Orientation = Orientation.Vertical,
+			Spacing = 4,
+			Items = { chipRowTop, chipRowBottom }
+		};
+
+		var layout = new DynamicLayout {
+			Padding = new Padding(10, 8),
+			Spacing = new Size(8, 6)
+		};
 		layout.BeginHorizontal();
-		layout.Add(new Label { Text = "Show", VerticalAlignment = VerticalAlignment.Center });
-		layout.Add(pathBox, xscale: true);
-		layout.Add(new Label { Text = "·", VerticalAlignment = VerticalAlignment.Center });
-		layout.Add(typeDropDown);
-		layout.Add(exportPngButton);
-		layout.Add(resetButton);
+		layout.Add(showLabel, yscale: false);
+		layout.Add(pathBox, xscale: true, yscale: false);
+		layout.Add(exportPngButton, yscale: false);
+		layout.Add(resetButton, yscale: false);
 		layout.EndHorizontal();
 		layout.BeginHorizontal();
-		layout.Add(new Label { Text = "Hide", VerticalAlignment = VerticalAlignment.Center });
-		layout.Add(excludeBox, xscale: true);
+		layout.Add(hideLabel, yscale: false);
+		layout.Add(excludeBox, xscale: true, yscale: false);
+		layout.EndHorizontal();
+		layout.BeginHorizontal();
+		layout.Add(typeLabel, yscale: false);
+		layout.Add(chipColumn, xscale: true, yscale: false);
 		layout.EndHorizontal();
 		layout.AddRow(hintLabel);
 		Content = layout;
+		AppTheme.ApplyPanel(this, raised: true);
 		UpdateHint();
 	}
 
-	public string SelectedTypeFilterKey => typeDropDown.SelectedKey ?? "";
+	public string SelectedTypeFilterKey => selectedTypeKey;
 
 	public string SelectedExcludeFilterText => excludeBox.Text.Trim();
 
@@ -63,6 +117,7 @@ internal sealed class TreeFilterBar : Panel {
 		debounce?.Cancel();
 		pathBox.Text = "";
 		suppressEvents = false;
+		TreeViewFilter.ClearRevealPath();
 		FileSearchFilter.Clear();
 		UpdateHint();
 		if (notify)
@@ -74,8 +129,10 @@ internal sealed class TreeFilterBar : Panel {
 		debounce?.Cancel();
 		pathBox.Text = "";
 		excludeBox.Text = "";
-		typeDropDown.SelectedKey = "";
+		selectedTypeKey = "";
 		suppressEvents = false;
+		UpdateTypeChipStyles();
+		TreeViewFilter.ClearRevealPath();
 		FileSearchFilter.Clear();
 		FileExcludeFilter.Clear();
 		FileFormatFilter.Clear();
@@ -83,6 +140,19 @@ internal sealed class TreeFilterBar : Panel {
 		PersistFilters();
 		if (notify)
 			FiltersChanged?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void SelectTypeFilter(string key) {
+		if (suppressEvents || selectedTypeKey == key)
+			return;
+		selectedTypeKey = key;
+		UpdateTypeChipStyles();
+		ApplyFilters();
+	}
+
+	private void UpdateTypeChipStyles() {
+		foreach (var (key, chip) in typeChips)
+			AppTheme.StyleButton(chip, key == selectedTypeKey ? ThemeButtonVariant.Primary : ThemeButtonVariant.Ghost);
 	}
 
 	private async Task DebouncedApplyAsync() {
@@ -100,13 +170,13 @@ internal sealed class TreeFilterBar : Panel {
 	private void ApplyFilters() {
 		if (suppressEvents)
 			return;
+		TreeViewFilter.ClearRevealPath();
 		FileSearchFilter.Set(pathBox.Text);
 		FileExcludeFilter.Set(excludeBox.Text);
-		var typeKey = typeDropDown.SelectedKey ?? "";
-		if (string.IsNullOrEmpty(typeKey))
+		if (string.IsNullOrEmpty(selectedTypeKey))
 			FileFormatFilter.Clear();
 		else
-			FileFormatFilter.SetPreset(typeKey);
+			FileFormatFilter.SetPreset(selectedTypeKey);
 		UpdateHint();
 		PersistFilters();
 		FiltersChanged?.Invoke(this, EventArgs.Empty);
@@ -119,10 +189,10 @@ internal sealed class TreeFilterBar : Panel {
 		resetButton.Enabled = hasPath || hasExclude || hasType;
 		exportPngButton.Enabled = hasPath || hasExclude || hasType;
 		if (!hasPath && !hasExclude && !hasType) {
-			hintLabel.Text = "Trees show all files. Narrow by path text, excluded words, and/or file type.";
+			hintLabel.Text = "Trees show all files. Narrow by path, excluded words, and/or file type.";
 			return;
 		}
-		var parts = new System.Collections.Generic.List<string>();
+		var parts = new List<string>();
 		if (hasPath)
 			parts.Add($"path contains \"{FileSearchFilter.Text}\"");
 		if (hasExclude)
@@ -133,35 +203,34 @@ internal sealed class TreeFilterBar : Panel {
 	}
 
 	private string GetSelectedTypeLabel() {
-		var key = typeDropDown.SelectedKey ?? "";
-		foreach (ListItem item in typeDropDown.Items) {
-			if (item.Key == key)
-				return item.Text;
+		foreach (var (key, button) in typeChips) {
+			if (key == selectedTypeKey)
+				return button.Text;
 		}
-		return key;
+		return selectedTypeKey;
 	}
 
 	private void RestoreSavedFilters() {
 		var saved = LayoutSettingsStore.Load();
 		suppressEvents = true;
-		typeDropDown.SelectedKey = IsValidTypeKey(saved.FilterType) ? saved.FilterType : "";
+		selectedTypeKey = IsValidTypeKey(saved.FilterType) ? saved.FilterType : "";
 		excludeBox.Text = saved.FilterExclude;
 		suppressEvents = false;
+		UpdateTypeChipStyles();
 		SyncFilters();
 		UpdateHint();
 	}
 
 	private void SyncFilters() {
-		var typeKey = typeDropDown.SelectedKey ?? "";
-		if (string.IsNullOrEmpty(typeKey))
+		if (string.IsNullOrEmpty(selectedTypeKey))
 			FileFormatFilter.Clear();
 		else
-			FileFormatFilter.SetPreset(typeKey);
+			FileFormatFilter.SetPreset(selectedTypeKey);
 		FileExcludeFilter.Set(excludeBox.Text);
 	}
 
 	private static bool IsValidTypeKey(string key) {
-		return key is "Images" or "Text" or "Data" or "Audio" or "Video";
+		return key is "Images" or "UvSequence" or "Text" or "Data" or "Audio" or "Video";
 	}
 
 	private void PersistFilters() {
@@ -170,7 +239,7 @@ internal sealed class TreeFilterBar : Panel {
 			layout.MainSplitter,
 			layout.InnerSplitter,
 			layout.InfoAutoHide,
-			typeDropDown.SelectedKey ?? "",
+			selectedTypeKey,
 			excludeBox.Text.Trim()));
 	}
 }

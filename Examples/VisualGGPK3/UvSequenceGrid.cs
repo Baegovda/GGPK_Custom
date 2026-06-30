@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.RegularExpressions;
 
 namespace VisualGGPK3;
@@ -10,12 +11,21 @@ internal readonly struct UvSequenceGrid(int columns, int rows) {
 	private static readonly Regex Pattern = new(@"(?<![\d.])(\d{1,2})x(\d{1,2})(?![\d.])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
 	public static bool TryParse(string fileName, string? path, out UvSequenceGrid grid) {
-		if (TryParseSegment(fileName, out grid))
+		if (TryParseSegment(Path.GetFileNameWithoutExtension(fileName), out grid))
 			return true;
-		if (!string.IsNullOrEmpty(path) && TryParseSegment(path.Replace('\\', '/'), out grid))
+		if (!string.IsNullOrEmpty(path) && TryParsePath(path, out grid))
 			return true;
 		grid = default;
 		return false;
+	}
+
+	private static bool TryParsePath(string path, out UvSequenceGrid grid) {
+		var normalized = path.Replace('\\', '/').TrimEnd('/');
+		var slash = normalized.LastIndexOf('/');
+		var fileSegment = slash >= 0 ? normalized[(slash + 1)..] : normalized;
+		if (TryParseSegment(Path.GetFileNameWithoutExtension(fileSegment), out grid))
+			return true;
+		return TryParseSegment(normalized, out grid);
 	}
 
 	private static bool TryParseSegment(string text, out UvSequenceGrid grid) {

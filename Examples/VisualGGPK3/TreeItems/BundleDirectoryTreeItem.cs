@@ -62,19 +62,21 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 
 	private bool FilterItem(ITreeItem item) => item switch {
 		FileTreeItem f => TreeViewFilter.MatchesFile(f),
-		BundleDirectoryTreeItem d => d.HasMatchingDescendant(),
+		BundleDirectoryTreeItem d => d.HasFilteredVisibleChild(),
 		_ => true
 	};
 
-	internal bool HasMatchingDescendant() {
-		foreach (var child in Children) {
-			if (child is BundleFileTreeItem f && TreeViewFilter.MatchesFile(f))
-				return true;
-			if (child is BundleDirectoryTreeItem d && d.HasMatchingDescendant())
+	internal bool HasFilteredVisibleChild() {
+		if (!TreeViewFilter.IsActive)
+			return Children.Count > 0;
+		foreach (var node in Children) {
+			if (node is ITreeItem item && FilterItem(item))
 				return true;
 		}
 		return false;
 	}
+
+	internal bool HasMatchingDescendant() => HasFilteredVisibleChild();
 
 	internal FileTreeItem? FindFileByPath(string path) {
 		path = FavoritePaths.Normalize(path);
@@ -91,6 +93,23 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 		}
 		dir.Expanded = true;
 		return dir.FindChildFile(segments[^1]);
+	}
+
+	internal DirectoryTreeItem? FindDirectoryByPath(string path) {
+		path = FavoritePaths.DirectoryLookupPath(path);
+		if (string.IsNullOrEmpty(path))
+			return this;
+		var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		var dir = this;
+		foreach (var segment in segments) {
+			var childDir = dir.FindChildDirectory(segment);
+			if (childDir is null)
+				return null;
+			childDir.Expanded = true;
+			dir = childDir;
+		}
+		dir.Expanded = true;
+		return dir;
 	}
 
 	internal BundleDirectoryTreeItem? FindChildDirectory(string name) {
@@ -119,6 +138,8 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 		for (var i = 0; i < Children.Count; ++i)
 			yield return (ITreeItem)Children[i];
 	}
+
+	public override bool Expandable => !Initialized ? HasFilteredVisibleChild() : Count > 0;
 
 	protected internal override void InvalidateFilterCache() {
 		_ChildItems = null;

@@ -1,4 +1,4 @@
-![VisualGGPK3](https://img.shields.io/badge/VisualGGPK3-2.8.7-blue)
+![VisualGGPK3](https://img.shields.io/badge/VisualGGPK3-2.9.27-blue)
 ![LibGGPK3 upstream](https://img.shields.io/badge/upstream-LibGGPK3%202.7.5-lightgrey)
 [![Releases](https://img.shields.io/github/v/release/Baegovda/GGPK_Custom?label=release)](https://github.com/Baegovda/GGPK_Custom/releases)
 
@@ -27,7 +27,7 @@ Path of Exile `Content.ggpk` 및 번들 파일을 열고, 필터·미리보기·
 
 ## VisualGGPK3
 
-Eto.Forms + WPF 기반 GGPK/번들 뷰어. **2.8.7** 기준 주요 기능:
+Eto.Forms + WPF 기반 GGPK/번들 뷰어. **2.9.24** 기준 주요 기능:
 
 | 영역 | 기능 |
 |------|------|
@@ -35,8 +35,8 @@ Eto.Forms + WPF 기반 GGPK/번들 뷰어. **2.8.7** 기준 주요 기능:
 | **이미지** | DDS 등 미리보기, 줌/팬, UV 스프라이트 시퀀스(`NxM` 그리드), 필터 결과 PNG 일괄보내기 |
 | **오디오** | WAV / OGG / MP3 재생 |
 | **영상** | MP4 (LibVLC), BK2/Bink2 (`bink2w64.dll` — PoE 설치 경로 자동 탐색 또는 수동 지정) |
-| **즐겨찾기** | 왼쪽 목록 패널에 등록·클릭 이동·우클릭 제거 |
-| **기타** | 최근 파일, 로드 상태 표시, 진단 로그, 레이아웃/필터 설정 저장 |
+| **즐겨찾기** | **사용자 폴더**·드래그 정리, 파일·GGPK 폴더 등록·미리보기 이동 |
+| **기타** | 최근 파일, **Update** 원클릭 자동 업데이트, 로드 상태 표시, 진단 로그, 레이아웃/필터 설정 저장 |
 
 ---
 

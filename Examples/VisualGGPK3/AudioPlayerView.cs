@@ -7,29 +7,39 @@ namespace VisualGGPK3;
 
 internal sealed class AudioPlayerView : Panel {
 	private const int SeekScale = 10000;
+	private const int VisualBarCount = 14;
 
 	private readonly AudioPlayback playback = new();
+	private readonly Drawable visual = new();
 	private readonly Label titleLabel = new() {
-		TextColor = Colors.White,
-		Font = SystemFonts.Bold()
+		Wrap = WrapMode.Word,
+		VerticalAlignment = VerticalAlignment.Center
 	};
 	private readonly Label pathLabel = new() {
-		TextColor = new Color(0.75f, 0.75f, 0.78f),
-		Wrap = WrapMode.Word
+		Wrap = WrapMode.Word,
+		VerticalAlignment = VerticalAlignment.Center
+	};
+	private readonly Label statusLabel = new() {
+		Text = "Ready",
+		VerticalAlignment = VerticalAlignment.Center
 	};
 	private readonly Label detailsLabel = new() {
-		TextColor = new Color(0.7f, 0.7f, 0.74f),
-		Wrap = WrapMode.Word
+		Wrap = WrapMode.Word,
+		VerticalAlignment = VerticalAlignment.Top
 	};
 	private readonly Label currentTimeLabel = new() {
 		Text = "0:00",
-		TextColor = Colors.White,
-		Width = 44
+		Width = 48,
+		TextAlignment = TextAlignment.Right
 	};
 	private readonly Label totalTimeLabel = new() {
 		Text = "0:00",
-		TextColor = Colors.White,
-		Width = 44
+		Width = 48
+	};
+	private readonly Label volumeValueLabel = new() {
+		Text = "100%",
+		Width = 40,
+		TextAlignment = TextAlignment.Right
 	};
 	private readonly Slider seekSlider = new() {
 		MinValue = 0,
@@ -39,23 +49,33 @@ internal sealed class AudioPlayerView : Panel {
 	private readonly Slider volumeSlider = new() {
 		MinValue = 0,
 		MaxValue = 100,
-		Value = 100,
-		Width = 110
+		Value = 100
 	};
 	private readonly Label volumeLabel = new() {
-		Text = "Vol",
-		TextColor = new Color(0.8f, 0.8f, 0.82f)
+		Text = "Volume",
+		Width = 52
 	};
-	private readonly Button playPauseButton = new() { Text = "Play", Width = 72 };
+	private readonly Button playPauseButton = new() { Text = "Play", Width = 96 };
 	private readonly Button stopButton = new() { Text = "Stop", Width = 72, Enabled = false };
 	private readonly UITimer positionTimer;
 	private bool seekDragging;
 	private string? playbackError;
+	private int visualSeed;
+	private double visualPhase;
 
 	public AudioPlayerView() {
-		BackgroundColor = new Color(0.1f, 0.1f, 0.12f, 0.94f);
-		Padding = new Padding(16);
-		MinimumSize = new Size(420, 168);
+		AppTheme.ApplyPanel(this, raised: true);
+		Padding = new Padding(18, 16);
+		MinimumSize = new Size(480, 220);
+
+		StyleLabels();
+		AppTheme.StyleButton(playPauseButton, ThemeButtonVariant.Primary);
+		AppTheme.StyleButton(stopButton, ThemeButtonVariant.Ghost);
+		AppTheme.StyleSlider(seekSlider);
+		AppTheme.StyleSlider(volumeSlider);
+
+		visual.Size = new Size(76, 76);
+		visual.Paint += OnVisualPaint;
 
 		playPauseButton.Click += (_, _) => TogglePlayPauseCore();
 		stopButton.Click += (_, _) => Stop();
@@ -65,19 +85,45 @@ internal sealed class AudioPlayerView : Panel {
 			seekDragging = false;
 			ApplySeekFromSlider();
 		};
-		volumeSlider.ValueChanged += (_, _) => playback.Volume = (float)(volumeSlider.Value / 100.0);
+		volumeSlider.ValueChanged += (_, _) => {
+			playback.Volume = (float)(volumeSlider.Value / 100.0);
+			volumeValueLabel.Text = $"{volumeSlider.Value:0}%";
+		};
 
 		playback.StateChanged += OnPlaybackStateChanged;
 		playback.PlaybackEnded += OnPlaybackEnded;
 
 		positionTimer = new UITimer((_, _) => UpdatePositionUi()) { Interval = 0.1 };
 
-		var transportRow = new StackLayout {
+		var headerRow = new StackLayout {
+			Orientation = Orientation.Horizontal,
+			Spacing = 14,
+			VerticalContentAlignment = VerticalAlignment.Center,
+			Items = {
+				visual,
+				new StackLayoutItem(new StackLayout {
+					Orientation = Orientation.Vertical,
+					Spacing = 4,
+					Items = {
+						titleLabel,
+						pathLabel,
+						statusLabel
+					}
+				}, expand: true)
+			}
+		};
+
+		var transportButtons = new StackLayout {
 			Orientation = Orientation.Horizontal,
 			Spacing = 8,
+			Items = { playPauseButton, stopButton }
+		};
+
+		var seekRow = new StackLayout {
+			Orientation = Orientation.Horizontal,
+			Spacing = 10,
+			VerticalContentAlignment = VerticalAlignment.Center,
 			Items = {
-				playPauseButton,
-				stopButton,
 				currentTimeLabel,
 				new StackLayoutItem(seekSlider, expand: true),
 				totalTimeLabel
@@ -86,32 +132,51 @@ internal sealed class AudioPlayerView : Panel {
 
 		var volumeRow = new StackLayout {
 			Orientation = Orientation.Horizontal,
-			Spacing = 8,
+			Spacing = 10,
+			VerticalContentAlignment = VerticalAlignment.Center,
 			Items = {
 				volumeLabel,
-				volumeSlider
+				new StackLayoutItem(volumeSlider, expand: true),
+				volumeValueLabel
 			}
 		};
 
-		var layout = new DynamicLayout { Spacing = new Size(6, 8) };
-		layout.AddRow(titleLabel);
-		layout.AddRow(pathLabel);
-		layout.AddRow(transportRow);
-		layout.AddRow(volumeRow);
-		layout.AddRow(detailsLabel);
-		Content = layout;
+		var transportCard = new Panel { Padding = new Padding(12, 10) };
+		AppTheme.ApplyPanel(transportCard, raised: true);
+		transportCard.Content = new StackLayout {
+			Orientation = Orientation.Vertical,
+			Spacing = 10,
+			Items = {
+				transportButtons,
+				seekRow,
+				volumeRow
+			}
+		};
+
+		Content = new StackLayout {
+			Orientation = Orientation.Vertical,
+			Spacing = 12,
+			Items = {
+				headerRow,
+				transportCard,
+				detailsLabel
+			}
+		};
 	}
 
 	public void SetAudio(string fileName, string path, string details, ReadOnlyMemory<byte> data) {
 		playbackError = null;
 		playback.Load(fileName, data);
+		visualSeed = fileName.GetHashCode(StringComparison.OrdinalIgnoreCase);
 		titleLabel.Text = fileName;
 		pathLabel.Text = path;
 		detailsLabel.Text = details;
 		volumeSlider.Value = (int)Math.Round(playback.Volume * 100);
+		volumeValueLabel.Text = $"{volumeSlider.Value:0}%";
 		UpdateTimeLabels();
 		UpdateSeekSlider();
 		UpdateTransportButtons();
+		visual.Invalidate();
 	}
 
 	public void Unload() {
@@ -119,16 +184,33 @@ internal sealed class AudioPlayerView : Panel {
 		playback.Unload();
 		seekDragging = false;
 		playbackError = null;
+		visualSeed = 0;
+		visualPhase = 0;
 		titleLabel.Text = "";
 		pathLabel.Text = "";
 		detailsLabel.Text = "";
+		statusLabel.Text = "Ready";
 		currentTimeLabel.Text = "0:00";
 		totalTimeLabel.Text = "0:00";
+		volumeValueLabel.Text = "100%";
 		seekSlider.Value = 0;
 		UpdateTransportButtons();
+		visual.Invalidate();
 	}
 
 	public void TogglePlayPause() => TogglePlayPauseCore();
+
+	private void StyleLabels() {
+		AppTheme.StyleHeaderLabel(titleLabel);
+		titleLabel.Font = new Font(SystemFonts.Bold().Family, SystemFonts.Bold().Size + 1, FontStyle.Bold);
+		AppTheme.StyleCaptionLabel(pathLabel);
+		AppTheme.StyleHintLabel(statusLabel);
+		AppTheme.StyleHintLabel(detailsLabel);
+		AppTheme.StyleTimeLabel(currentTimeLabel);
+		AppTheme.StyleTimeLabel(totalTimeLabel, muted: true);
+		AppTheme.StyleCaptionLabel(volumeLabel);
+		AppTheme.StyleCaptionLabel(volumeValueLabel);
+	}
 
 	private void TogglePlayPauseCore() {
 		if (!playback.CanPlay)
@@ -139,6 +221,8 @@ internal sealed class AudioPlayerView : Panel {
 				positionTimer.Start();
 			else
 				positionTimer.Stop();
+			UpdateTransportButtons();
+			visual.Invalidate();
 		} catch (Exception ex) {
 			ShowPlaybackError(ex.Message);
 		}
@@ -150,6 +234,7 @@ internal sealed class AudioPlayerView : Panel {
 		UpdateSeekSlider();
 		UpdateTimeLabels();
 		UpdateTransportButtons();
+		visual.Invalidate();
 	}
 
 	private void OnSeekSliderChanged() {
@@ -182,6 +267,10 @@ internal sealed class AudioPlayerView : Panel {
 			return;
 		UpdateSeekSlider();
 		UpdateTimeLabels();
+		if (playback.State == AudioPlaybackState.Playing) {
+			visualPhase += 0.22;
+			visual.Invalidate();
+		}
 	}
 
 	private void UpdateSeekSlider() {
@@ -205,6 +294,12 @@ internal sealed class AudioPlayerView : Panel {
 		stopButton.Enabled = canPlay && playback.State != AudioPlaybackState.Stopped;
 		seekSlider.Enabled = canPlay && playback.Duration > TimeSpan.Zero;
 		playPauseButton.Text = playback.State == AudioPlaybackState.Playing ? "Pause" : "Play";
+		statusLabel.Text = playbackError is not null ? "Playback error"
+			: playback.State switch {
+				AudioPlaybackState.Playing => "Playing",
+				AudioPlaybackState.Paused => "Paused",
+				_ => canPlay ? "Ready" : "Unavailable"
+			};
 	}
 
 	private void OnPlaybackStateChanged() {
@@ -212,6 +307,7 @@ internal sealed class AudioPlayerView : Panel {
 			UpdateTransportButtons();
 			if (playback.State == AudioPlaybackState.Stopped)
 				positionTimer.Stop();
+			visual.Invalidate();
 		});
 	}
 
@@ -221,6 +317,7 @@ internal sealed class AudioPlayerView : Panel {
 			UpdateSeekSlider();
 			UpdateTimeLabels();
 			UpdateTransportButtons();
+			visual.Invalidate();
 		});
 	}
 
@@ -230,6 +327,34 @@ internal sealed class AudioPlayerView : Panel {
 		playback.Stop();
 		detailsLabel.Text = (detailsLabel.Text ?? "") + Environment.NewLine + "Playback failed: " + message;
 		UpdateTransportButtons();
+		visual.Invalidate();
+	}
+
+	private void OnVisualPaint(object? sender, PaintEventArgs e) {
+		var g = e.Graphics;
+		var w = Math.Max(1, visual.Width);
+		var h = Math.Max(1, visual.Height);
+		var bounds = new RectangleF(0, 0, w, h);
+		var accent = AppTheme.Accent;
+		g.FillRectangle(new Color(accent.R, accent.G, accent.B, 0.14f), bounds);
+		g.DrawRectangle(new Color(accent.R, accent.G, accent.B, 0.35f), bounds.X, bounds.Y, bounds.Width, bounds.Height);
+
+		var playing = playback.State == AudioPlaybackState.Playing;
+		var gap = 3f;
+		var barWidth = Math.Max(2f, (w - gap * (VisualBarCount + 1)) / VisualBarCount);
+		for (var i = 0; i < VisualBarCount; i++) {
+			var seed = visualSeed + i * 17;
+			var baseLevel = 0.22f + Math.Abs(seed % 73) / 100f;
+			var anim = playing ? (float)(Math.Sin(visualPhase + i * 0.65) * 0.18) : 0f;
+			var level = Math.Clamp(baseLevel + anim, 0.12f, 0.92f);
+			var barHeight = h * level;
+			var x = gap + i * (barWidth + gap);
+			var y = h - barHeight - gap;
+			var barColor = playing
+				? new Color(accent.R, accent.G, accent.B, 0.92f)
+				: new Color(accent.R, accent.G, accent.B, 0.55f);
+			g.FillRectangle(barColor, x, y, barWidth, barHeight);
+		}
 	}
 
 	private static string FormatTime(TimeSpan time) {
