@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.9.27` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.27)` |
+| **솔루션 / 어셈블리** | `2.9.29` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.29)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -53,6 +53,16 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.29 (2026-06-30) — 게임 실행 중 GGPK 경고
+
+- `PoeGameDetector` — PoE 클라이언트 프로세스·게임 경로 감지
+- 잠금 시 한국어 경고 대화상자 (게임 종료 또는 복사본 안내)
+
+### 2.9.28 (2026-06-30) — GGPK 파일 잠금
+
+- `GGPK.OpenFileStream` / `Index.OpenIndexStream` — ReadWrite 실패 시 Read+ShareReadWrite 폴백
+- `MainWindow.CreateArchiveLoadError` — IOException 시 게임 실행 중 안내, 크래시 방지
 
 ### 2.9.27 (2026-06-30) — 상단 UI 레이아웃 수정
 

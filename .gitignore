@@ -402,3 +402,6 @@ FodyWeavers.xsd
 
 # oo2core libraries
 oo2core/
+
+# Release zip artifacts (uploaded to GitHub Releases, not versioned)
+scripts/release-packages/

@@ -143,11 +143,19 @@ public class Index : IDisposable {
 	/// <param name="bundleFactory">Factory to handle .bin files of <see cref="Bundle"/></param>
 	/// <exception cref="FileNotFoundException" />
 	public Index(string filePath, bool parsePaths = true, IBundleFactory? bundleFactory = null) : this(
-			  File.Open(filePath = Utils.ExpandPath(filePath), FileMode.Open, FileAccess.ReadWrite, FileShare.Read),
+			  OpenIndexStream(filePath = Utils.ExpandPath(filePath)),
 			  false,
 			  parsePaths,
 			  bundleFactory ?? new DriveBundleFactory(Path.GetDirectoryName(Path.GetFullPath(filePath))!)
 		) { }
+
+	internal static FileStream OpenIndexStream(string path) {
+		try {
+			return File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+		} catch (IOException) {
+			return File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+		}
+	}
 
 	/// <summary>
 	/// Initialize with <paramref name="stream"/>.

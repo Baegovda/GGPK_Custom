@@ -407,32 +407,36 @@ public sealed class MainWindow : Form {
 	}
 
 	private async Task LoadFileAsync(string path) {
-		await DiagnosticLog.MeasureAsync("archive", "load", async () => {
-		if (!File.Exists(path))
-			throw new FileNotFoundException(path);
+		try {
+			await DiagnosticLog.MeasureAsync("archive", "load", async () => {
+			if (!File.Exists(path))
+				throw new FileNotFoundException(path);
 
-		DiagnosticLog.User("open_archive", new Dictionary<string, object?> { ["path"] = path });
+			DiagnosticLog.User("open_archive", new Dictionary<string, object?> { ["path"] = path });
 
-		Application.Instance.Invoke(() => BeginArchiveLoadUi(path));
+			Application.Instance.Invoke(() => BeginArchiveLoadUi(path));
 
-		ArchiveLoadResult loadResult;
-		if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-			loadResult = await Task.Run(() => LoadBinArchive(path));
-		else
-			loadResult = await Task.Run(() => LoadGgpkArchive(path));
+			ArchiveLoadResult loadResult;
+			if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+				loadResult = await Task.Run(() => LoadBinArchive(path));
+			else
+				loadResult = await Task.Run(() => LoadGgpkArchive(path));
 
-		BundleDirectoryTreeItem? bundleRoot = null;
-		if (loadResult.Index is not null && loadResult.Failed != loadResult.Index.Files.Count) {
-			var index = loadResult.Index;
-			bundleRoot = await Task.Run(() => (BundleDirectoryTreeItem)index.BuildTree(
-				BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree),
-				BundleFileTreeItem.CreateInstance,
-				true));
+			BundleDirectoryTreeItem? bundleRoot = null;
+			if (loadResult.Index is not null && loadResult.Failed != loadResult.Index.Files.Count) {
+				var index = loadResult.Index;
+				bundleRoot = await Task.Run(() => (BundleDirectoryTreeItem)index.BuildTree(
+					BundleDirectoryTreeItem.GetFuncCreateInstance(BundleTree),
+					BundleFileTreeItem.CreateInstance,
+					true));
+			}
+
+			var bundles = bundleRoot;
+			Application.Instance.Invoke(() => FinishArchiveLoadUi(path, loadResult, bundles));
+			}, new Dictionary<string, object?> { ["path"] = path });
+		} catch (Exception ex) {
+			Application.Instance.Invoke(() => FinishArchiveLoadUi(path, CreateArchiveLoadError(path, ex), null));
 		}
-
-		var bundles = bundleRoot;
-		Application.Instance.Invoke(() => FinishArchiveLoadUi(path, loadResult, bundles));
-		}, new Dictionary<string, object?> { ["path"] = path });
 	}
 
 	private void BeginArchiveLoadUi(string path) {
@@ -474,15 +478,27 @@ public sealed class MainWindow : Form {
 	}
 
 	private static ArchiveLoadResult LoadBinArchive(string path) {
-		var index = new LibBundle3.Index(path, false);
-		return new ArchiveLoadResult {
-			Failed = index.ParsePaths(),
-			Index = index,
-			BinOnly = true
-		};
+		try {
+			var index = new LibBundle3.Index(path, false);
+			return new ArchiveLoadResult {
+				Failed = index.ParsePaths(),
+				Index = index,
+				BinOnly = true
+			};
+		} catch (Exception ex) {
+			return CreateArchiveLoadError(path, ex);
+		}
 	}
 
 	private ArchiveLoadResult LoadGgpkArchive(string path) {
+		if (PoeGameDetector.IsClientRunning() && PoeGameDetector.IsGameArchivePath(path)) {
+			try {
+				using var probe = GGPK.OpenFileStream(path);
+			} catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) {
+				return CreateArchiveLoadError(path, ex);
+			}
+		}
+
 		try {
 			var ggpk = new BundledGGPK(path, false);
 			return new ArchiveLoadResult {
@@ -490,12 +506,13 @@ public sealed class MainWindow : Form {
 				Ggpk = ggpk,
 				Index = ggpk.Index
 			};
-		} catch (Exception ex) {
-			if (ex is DllNotFoundException { Message: var dllMsg }
-				&& dllMsg.Contains("oo2core", StringComparison.OrdinalIgnoreCase)) {
+		} catch (Exception ex) when (ex is DllNotFoundException { Message: var dllMsg }
+			&& dllMsg.Contains("oo2core", StringComparison.OrdinalIgnoreCase)) {
+			try {
+				var ggpk = new GGPK(path);
 				return new ArchiveLoadResult {
 					Failed = 0,
-					Ggpk = new GGPK(path),
+					Ggpk = ggpk,
 					DialogTitle = "oo2core 없음",
 					DialogMessage =
 						"Bundled GGPK (PoE2 등)을 읽으려면 oo2core.dll 이 필요합니다.\r\n\r\n" +
@@ -504,29 +521,52 @@ public sealed class MainWindow : Form {
 						$"상세: {dllMsg}",
 					DialogType = MessageBoxType.Error
 				};
+			} catch (Exception fallback) {
+				return CreateArchiveLoadError(path, fallback);
 			}
-			if (ex is FileNotFoundException or DirectoryNotFoundException) {
-				return new ArchiveLoadResult {
-					Failed = 0,
-					Ggpk = new GGPK(path),
-					DialogTitle = "Warning",
-					DialogMessage = ex.GetNameAndMessage(),
-					DialogType = MessageBoxType.Warning
-				};
-			}
+		} catch (Exception ex) {
+			return CreateArchiveLoadError(path, ex);
+		}
+	}
+
+	private static ArchiveLoadResult CreateArchiveLoadError(string path, Exception ex) {
+		if (ex is FileNotFoundException or DirectoryNotFoundException) {
 			return new ArchiveLoadResult {
-				Failed = 0,
-				Ggpk = new GGPK(path),
-				DialogTitle = "Error",
-				DialogMessage = ex.ToString(),
-				DialogType = MessageBoxType.Error
+				DialogTitle = "Warning",
+				DialogMessage = ex.GetNameAndMessage(),
+				DialogType = MessageBoxType.Warning
 			};
 		}
+		if (ex is IOException or UnauthorizedAccessException) {
+			var gameLikely = PoeGameDetector.IsClientRunning() && PoeGameDetector.IsGameArchivePath(path);
+			return new ArchiveLoadResult {
+				DialogTitle = gameLikely ? "게임 실행 중 — GGPK를 열 수 없음" : "파일을 열 수 없음",
+				DialogMessage = gameLikely
+					? PoeGameDetector.BuildGameLockWarning(path)
+					: "다른 프로그램이 파일을 사용 중입니다.\n\n" + Path.GetFullPath(path),
+				DialogType = MessageBoxType.Warning
+			};
+		}
+		return new ArchiveLoadResult {
+			DialogTitle = "Error",
+			DialogMessage = ex.Message,
+			DialogType = MessageBoxType.Error
+		};
 	}
 
 	private void FinishArchiveLoadUi(string path, ArchiveLoadResult loadResult, BundleDirectoryTreeItem? bundles) {
 		if (loadResult.DialogMessage is not null)
 			MessageBox.Show(this, loadResult.DialogMessage, loadResult.DialogTitle ?? "Error", loadResult.DialogType);
+
+		if (loadResult.Ggpk is null && loadResult.Index is null) {
+			var empty = new TreeItemCollection {
+				new TreeItem() { Text = "No file opened" }
+			};
+			GGPKTree.DataStore = empty;
+			BundleTree.DataStore = empty;
+			ShowLoadStatus(loadResult.DialogMessage ?? "Failed to open archive.");
+			return;
+		}
 
 		Ggpk = loadResult.Ggpk;
 		Index = loadResult.Index;

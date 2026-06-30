@@ -96,12 +96,25 @@ public class GGPK : IDisposable {
 
 	/// <param name="filePath">Path to Content.ggpk on disk</param>
 	/// <exception cref="FileNotFoundException" />
-	public GGPK(string filePath) : this(File.Open(Utils.ExpandPath(filePath), new FileStreamOptions() {
-		Mode = FileMode.Open,
-		Access = FileAccess.ReadWrite,
-		Share = FileShare.Read,
-		Options = FileOptions.RandomAccess
-	})) { }
+	public GGPK(string filePath) : this(OpenFileStream(Utils.ExpandPath(filePath))) { }
+
+	public static FileStream OpenFileStream(string path) {
+		try {
+			return File.Open(path, new FileStreamOptions() {
+				Mode = FileMode.Open,
+				Access = FileAccess.ReadWrite,
+				Share = FileShare.Read,
+				Options = FileOptions.RandomAccess
+			});
+		} catch (IOException) {
+			return File.Open(path, new FileStreamOptions() {
+				Mode = FileMode.Open,
+				Access = FileAccess.Read,
+				Share = FileShare.ReadWrite,
+				Options = FileOptions.RandomAccess
+			});
+		}
+	}
 
 	/// <param name="stream">Stream of the Content.ggpk file</param>
 	/// <param name="leaveOpen">If false, close the <paramref name="stream"/> when this instance is disposed</param>
