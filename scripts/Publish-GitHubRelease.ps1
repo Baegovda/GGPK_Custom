@@ -89,7 +89,12 @@ try {
 		if (-not (Test-Path -LiteralPath $packageScript)) {
 			throw "Missing $packageScript"
 		}
-		$zipPath = & $packageScript -RepoRoot $RepoRoot
+		$packageOutput = & $packageScript -RepoRoot $RepoRoot 2>&1
+		$zipPath = ($packageOutput | Where-Object { $_ -match '\.zip$' } | Select-Object -Last 1)
+		if ([string]::IsNullOrWhiteSpace($zipPath)) {
+			$zipPath = Join-Path $PSScriptRoot 'release-packages/VisualGGPK3-win-x64.zip'
+		}
+		$zipPath = $zipPath.Trim()
 		if (-not (Test-Path -LiteralPath $zipPath)) {
 			throw "Package script did not produce a zip: $zipPath"
 		}
