@@ -9,9 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.8.5` (`Directory.Build.props`) |
-| **이전 upstream** | `2.7.5` (LibGGPK3 원본) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.5)` — `Assembly` 버전에서 자동 표시 |
+| **솔루션 / 어셈블리** | `2.8.6` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.6)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -28,15 +27,19 @@
    - **PATCH** `2.8.0` → `2.8.1` : 버그 수정, UI 미세 조정, 단일 작은 기능
    - **MINOR** `2.8.x` → `2.9.0` : 눈에 띄는 신규 기능 묶음, 미리보기/필터 등 영역 단위 추가
    - **MAJOR** `2.x` → `3.0.0` : 사용자 지시 또는 호환성 깨는 대규모 개편 시에만
-3. **갱신 위치** (세 곳을 맞출 것)
+3. **갱신 위치** (다섯 곳 + GitHub)
    - `Directory.Build.props` → `<Version>`
    - `.github/Version.txt` → **맨 위 줄**에 새 버전 추가
    - 이 파일 → [버전 이력](#버전-이력) + changelog 항목
-4. **changelog 형식** — 버전별로:
+   - **`CHANGELOG.md`** → `## [X.Y.Z]` 섹션 (GitHub 공개용, handoff와 동기화)
+   - `README.md` — 배지·기능 표 (필요 시)
+4. **GitHub Release** — push 후 `scripts/Publish-GitHubRelease.ps1` 실행  
+   → `vX.Y.Z` 태그 + [Releases](https://github.com/Baegovda/GGPK_Custom/releases)에 CHANGELOG 본문 게시
+5. **changelog 형식** — 버전별로:
    - 한 줄 요약
    - bullet으로 사용자 관점 변경점
    - (선택) 수정/추가된 주요 파일
-5. **작업 마무리** — `dotnet build` 후 `build-run.ps1` 또는 `Run-VisualGGPK3.cmd`로 실행 확인.
+5. **작업 마무리** — `dotnet build` 후, push 시 `Publish-GitHubRelease.ps1`.
 
 ### 버전을 올리지 않는 경우
 
@@ -48,7 +51,14 @@
 
 ## 버전 이력
 
-> **2.8.0** = GitHub `Initial upload` 커밋 기준. **2.8.1~2.8.5** = 그 이후 로컬에서 누락 없이 PATCH 분리 기록.
+> **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.8.6 (2026-06-30) — GitHub 변경 이력 연동
+
+- `CHANGELOG.md` — README/Releases와 동기화되는 공개 changelog
+- `scripts/Publish-GitHubRelease.ps1` — 태그 + `gh release create`
+- README Releases 배지·CHANGELOG 링크
+- `version-bump-mandatory.mdc` — GitHub 동기화 단계 추가
 
 ### 2.8.5 (2026-06-30) — README · 버전업 강제 규칙
 
@@ -229,10 +239,11 @@ MainWindow
 
 작업 종료 시:
 
-1. 사용자-facing 변경 있으면 **버전 PATCH+1** (또는 규모에 따라 MINOR)
-2. `Directory.Build.props`, `.github/Version.txt`, **이 문서** 갱신
+1. 사용자-facing 변경 있으면 **버전 PATCH+1**
+2. `Directory.Build.props`, `.github/Version.txt`, **이 문서**, **`CHANGELOG.md`** 갱신
 3. `dotnet build` / `build-run.ps1` 확인
-4. changelog에 **무엇을 / 왜** 했는지 한국어 또는 사용자 언어로 기록
+4. GitHub 반영: `git push` 후 `scripts/Publish-GitHubRelease.ps1`
+5. changelog에 **무엇을 / 왜** 기록
 
 ---
 

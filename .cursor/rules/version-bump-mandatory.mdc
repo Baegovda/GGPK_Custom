@@ -1,55 +1,60 @@
 ---
-description: VisualGGPK3 작업 종료 전 버전업·changelog 필수 (강제)
+description: VisualGGPK3 작업 종료 전 버전업·changelog·GitHub Release 필수 (강제)
 alwaysApply: true
 ---
 
-# 버전업 · changelog — 작업 종료 전 필수 (예외 없음)
+# 버전업 · changelog · GitHub — 작업 종료 전 필수
 
-VisualGGPK3 또는 사용자에게 보이는 레포 변경을 **한 턴이라도** 마쳤다면, **응답을 보내기 전에** 아래 체크리스트를 **반드시** 완료한다. 사용자가 버전업을 말하지 않아도 **자동 의무**이다.
+VisualGGPK3 또는 사용자에게 보이는 레포 변경을 **한 턴이라도** 마쳤다면, **응답 보내기 전에** 아래를 **반드시** 완료한다.
 
-## 완료 조건 (전부 체크)
+## 1. 버전·문서 (코드 변경 시)
 
-1. `Directory.Build.props` → `<Version>` PATCH +0.0.1 (기본)
-2. `.github/Version.txt` → **맨 위 줄**에 새 버전 추가
-3. `VISUALGGPK3-HANDOFF.md` → **현재 버전** 표 + **버전 이력**에 changelog 항목 추가
-4. `README.md` — 사용자 대면 설명·기능·버전 배지가 바뀌었으면 함께 갱신
-5. `dotnet build Examples/VisualGGPK3/VisualGGPK3.csproj -c Debug` 성공 확인
+1. `Directory.Build.props` → `<Version>` PATCH +0.0.1
+2. `.github/Version.txt` → **맨 위**에 새 버전
+3. `VISUALGGPK3-HANDOFF.md` → 현재 버전 표 + 버전 이력 항목
+4. **`CHANGELOG.md`** → `## [X.Y.Z] — 날짜` 섹션 추가 (handoff와 동일 내용, 사용자용 요약)
+5. `README.md` — 배지·기능 설명이 바뀌었으면 갱신
+6. `dotnet build Examples/VisualGGPK3/VisualGGPK3.csproj -c Debug` 성공
 
-**위 1~3을 하지 않고 턴을 끝내지 말 것.** “나중에” / “다음에” 금지.
+**1~4 없이 턴 종료 금지.**
+
+## 2. GitHub 동기화 (push·릴리스)
+
+사용자가 **깃헙 업데이트**를 요청했거나, 버전업 후 원격 반영할 때:
+
+```powershell
+git add -A
+git commit -m "Release VisualGGPK3 X.Y.Z: 한 줄 요약."
+git push origin main
+powershell -ExecutionPolicy Bypass -File scripts/Publish-GitHubRelease.ps1
+```
+
+`Publish-GitHubRelease.ps1`이 하는 일:
+
+- `CHANGELOG.md`의 `## [버전]` 본문 → GitHub Release 노트
+- `git tag vX.Y.Z` + `gh release create` + `git push origin vX.Y.Z`
+
+**GitHub 저장소:** https://github.com/Baegovda/GGPK_Custom  
+**Releases 탭** = 공개 변경 이력. README 상단 CHANGELOG 링크와 동기화 유지.
 
 ## 버전 규칙
 
 | 유형 | 예 |
 |------|-----|
-| PATCH | 버그 수정, UI 조정, 작은 기능 1개 → `2.8.0` → `2.8.1` |
-| MINOR | 눈에 띄는 기능 묶음 → `2.8.x` → `2.9.0` |
-| MAJOR | 사용자 지시 또는 호환성 파괴 시만 |
+| PATCH | `2.8.5` → `2.8.6` |
+| MINOR | `2.8.x` → `2.9.0` |
+| MAJOR | 사용자 지시 시만 |
 
-## changelog 형식 (`VISUALGGPK3-HANDOFF.md`)
+## 문서 역할
 
-```markdown
-### 2.8.1 (YYYY-MM-DD) — 한 줄 요약
+| 파일 | 용도 |
+|------|------|
+| `VISUALGGPK3-HANDOFF.md` | 에이전트·개발 상세 (단일 소스) |
+| `CHANGELOG.md` | **GitHub 방문자용** 변경 이력 |
+| GitHub Releases | CHANGELOG 섹션과 **동일 내용** 자동 게시 |
 
-- 사용자 관점 변경 bullet
-- (선택) 주요 파일
-```
+## 자기 점검
 
-## 버전업 생략 (이 경우만)
-
-- 주석·공백만 변경
-- `VISUALGGPK3-HANDOFF.md`만 손보고 코드/동작 무변경
-- LibGGPK3 라이브러리만 수정하고 VisualGGPK3 UI/동작 무변경
-
-그 외 **모든** VisualGGPK3·README·레이아웃·즐겨찾기·필터·트리·미리보기 변경 → **반드시** 버전업.
-
-## 단일 소스
-
-맥락·버전·이력은 **`VISUALGGPK3-HANDOFF.md`** 하나에만 기록. 작업 시작 전 읽고, 종료 전 갱신.
-
-## 자기 점검 (응답 직전)
-
-- [ ] 버전 숫자 3곳 일치했는가?
-- [ ] handoff에 오늘 날짜 changelog가 있는가?
-- [ ] 빌드했는가?
-
-하나라도 아니면 **먼저 버전업·기록 후** 사용자에게 완료 보고.
+- [ ] Version 4곳 일치? (props, Version.txt, handoff, CHANGELOG 제목)
+- [ ] CHANGELOG에 새 `## [X.Y.Z]` 있음?
+- [ ] push 후 Release 스크립트 실행했음? (또는 사용자에게 실행 안내)
