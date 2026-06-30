@@ -53,7 +53,8 @@ internal static class Bink2Native {
 	}
 
 	public static string MissingDllMessage =>
-		"BK2 (Bink 2) cannot be played with VLC. Copy bink2w64.dll from your Path of Exile install folder next to VisualGGPK3.exe, or install PoE in a standard location.";
+		"BK2 playback needs bink2w64.dll from your Path of Exile install (Steam, Daum/Kakao, or standalone). " +
+		"Use “Locate bink2w64.dll…” below, or copy the DLL next to VisualGGPK3.exe.";
 
 	public static IntPtr Open(string path) {
 		EnsureResolver();

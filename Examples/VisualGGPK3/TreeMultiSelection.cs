@@ -72,6 +72,8 @@ internal sealed class TreeMultiSelection {
 		ApplyVisuals();
 	}
 
+	public void RefreshVisuals() => ApplyVisuals();
+
 	private void OnEtoSelectionChanged(object? sender, EventArgs _) {
 		if (internalChange)
 			return;

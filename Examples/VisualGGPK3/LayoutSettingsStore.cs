@@ -6,19 +6,21 @@ namespace VisualGGPK3;
 internal static class LayoutSettingsStore {
 	private const int DefaultMainSplitter = 160;
 	private const int DefaultInnerSplitter = 240;
+	private const int DefaultFavoritesSplitter = 220;
 
 	private static string SettingsPath => Path.Combine(
 		Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
 		"VisualGGPK3",
 		"layout.txt");
 
-	public readonly struct Layout(int mainSplitter, int innerSplitter, bool infoAutoHide = false, string filterType = "", string filterExclude = "") {
+	public readonly struct Layout(int mainSplitter, int innerSplitter, bool infoAutoHide = false, string filterType = "", string filterExclude = "", int favoritesSplitter = DefaultFavoritesSplitter) {
 		public int MainSplitter { get; } = mainSplitter;
 		public int InnerSplitter { get; } = innerSplitter;
 		public bool InfoAutoHide { get; } = infoAutoHide;
 		public string FilterType { get; } = filterType;
 		public string FilterExclude { get; } = filterExclude;
-		public static Layout Default => new(DefaultMainSplitter, DefaultInnerSplitter);
+		public int FavoritesSplitter { get; } = favoritesSplitter;
+		public static Layout Default => new(DefaultMainSplitter, DefaultInnerSplitter, favoritesSplitter: DefaultFavoritesSplitter);
 	}
 
 	public static Layout Load() {
@@ -30,6 +32,7 @@ internal static class LayoutSettingsStore {
 			var infoAutoHide = false;
 			var filterType = "";
 			var filterExclude = "";
+			var favorites = DefaultFavoritesSplitter;
 			foreach (var line in File.ReadAllLines(SettingsPath)) {
 				var sep = line.IndexOf('=');
 				if (sep <= 0)
@@ -49,9 +52,12 @@ internal static class LayoutSettingsStore {
 					filterType = value;
 				} else if (key.Equals("filterExclude", StringComparison.OrdinalIgnoreCase)) {
 					filterExclude = value;
+				} else if (key.Equals("favorites", StringComparison.OrdinalIgnoreCase)) {
+					if (int.TryParse(value, out var n) && n > 0)
+						favorites = n;
 				}
 			}
-			return new Layout(main, inner, infoAutoHide, filterType, filterExclude);
+			return new Layout(main, inner, infoAutoHide, filterType, filterExclude, favorites);
 		} catch {
 			return Layout.Default;
 		}
@@ -62,7 +68,7 @@ internal static class LayoutSettingsStore {
 			var dir = Path.GetDirectoryName(SettingsPath)!;
 			Directory.CreateDirectory(dir);
 			File.WriteAllText(SettingsPath,
-				$"main={layout.MainSplitter}{Environment.NewLine}inner={layout.InnerSplitter}{Environment.NewLine}infoAutoHide={(layout.InfoAutoHide ? 1 : 0)}{Environment.NewLine}filterType={layout.FilterType}{Environment.NewLine}filterExclude={layout.FilterExclude}{Environment.NewLine}");
+				$"main={layout.MainSplitter}{Environment.NewLine}inner={layout.InnerSplitter}{Environment.NewLine}favorites={layout.FavoritesSplitter}{Environment.NewLine}infoAutoHide={(layout.InfoAutoHide ? 1 : 0)}{Environment.NewLine}filterType={layout.FilterType}{Environment.NewLine}filterExclude={layout.FilterExclude}{Environment.NewLine}");
 		} catch {
 			// ignore persistence errors
 		}

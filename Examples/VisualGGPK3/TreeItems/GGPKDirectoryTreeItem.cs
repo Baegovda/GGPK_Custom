@@ -64,18 +64,42 @@ public class GGPKDirectoryTreeItem : DirectoryTreeItem {
 	internal bool HasMatchingDescendant() => HasMatchingInRecord(Record);
 
 	internal FileTreeItem? FindFileByPath(string path) {
+		path = FavoritePaths.Normalize(path);
+		if (!Record.TryFindNode(path, out var node) || node is not FileRecord)
+			return null;
+		var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		if (segments.Length == 0)
+			return null;
+		var dir = this;
+		for (var i = 0; i < segments.Length - 1; i++) {
+			var childDir = dir.FindChildDirectory(segments[i]);
+			if (childDir is null)
+				return null;
+			childDir.Expanded = true;
+			dir = childDir;
+		}
+		dir.Expanded = true;
+		return dir.FindChildFile(segments[^1]);
+	}
+
+	internal GGPKDirectoryTreeItem? FindChildDirectory(string name) {
 		if (!Initialized)
 			Expanded = true;
 		if (!Initialized)
 			return null;
 		foreach (var item in GetAllChildren()) {
-			if (item is GGPKFileTreeItem file && FavoritePaths.Equals(file.GetPath(), path))
+			if (item is GGPKDirectoryTreeItem dir && string.Equals(dir.Name, name, StringComparison.OrdinalIgnoreCase))
+				return dir;
+		}
+		return null;
+	}
+
+	internal FileTreeItem? FindChildFile(string name) {
+		if (!Initialized)
+			return null;
+		foreach (var item in GetAllChildren()) {
+			if (item is GGPKFileTreeItem file && string.Equals(file.Name, name, StringComparison.OrdinalIgnoreCase))
 				return file;
-			if (item is GGPKDirectoryTreeItem dir) {
-				var found = dir.FindFileByPath(path);
-				if (found is not null)
-					return found;
-			}
 		}
 		return null;
 	}

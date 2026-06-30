@@ -9,10 +9,11 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.8.0` (`Directory.Build.props`) |
+| **솔루션 / 어셈블리** | `2.8.5` (`Directory.Build.props`) |
 | **이전 upstream** | `2.7.5` (LibGGPK3 원본) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.0)` — `Assembly` 버전에서 자동 표시 |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.5)` — `Assembly` 버전에서 자동 표시 |
 | **마지막 정리일** | 2026-06-30 |
+| **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
 ---
 
@@ -46,6 +47,42 @@
 ---
 
 ## 버전 이력
+
+> **2.8.0** = GitHub `Initial upload` 커밋 기준. **2.8.1~2.8.5** = 그 이후 로컬에서 누락 없이 PATCH 분리 기록.
+
+### 2.8.5 (2026-06-30) — README · 버전업 강제 규칙
+
+- `README.md` — GGPK_Custom 포크 소개, Quick start, 2.8.x 기능 표
+- `.cursor/rules/version-bump-mandatory.mdc` — `alwaysApply: true` 버전·changelog 필수
+- `.cursor/rules/visualggpk3-workflow.mdc` — 빌드·handoff 참조 정리
+
+### 2.8.4 (2026-06-30) — BK2 재생 · 파일 크기 표시
+
+- **BK2** — Daum/Kakao/Steam/Epic 등 경로 확장, 전 드라이브·`libraryfolders.vdf` 탐색 (`Bink2Locator.cs`)
+- **수동 DLL** — `Bink2SettingsStore.cs` (`%AppData%\VisualGGPK3\bink2.txt`), 영상 플레이어 **Locate bink2w64.dll…** (`VideoPlayerView.cs`)
+- **크기 라벨** — KiB/MiB → **KB/MB** (`MediaPreviewPanel.cs`, `MainWindow.FormatByteSize`)
+
+### 2.8.3 (2026-06-30) — 즐겨찾기 목록 패널
+
+- 상단 콤보박스(`FavoritesBar`) 제거 → **왼쪽 Favorites 목록** (`FavoritesPanel.cs`, `TreeItemIcons.cs`)
+- 아이콘·파일명·폴더 컬럼, 클릭 이동, 우클릭/Delete 제거
+- `favorites` 스플리터 너비 저장 (`LayoutSettingsStore.cs`, `MainWindow.TreesLayout`)
+
+### 2.8.2 (2026-06-30) — 트리 펼침/접힘 · 필터 UI 안정화
+
+- 펼침/접힘마다 `RefreshItem` (`DirectoryTreeItem.cs`)
+- 필터 적용: 캐시 무효화 → 빈 폴더 접기 → **펼쳐진 폴더만** 갱신 (`TreeRefresh.cs`)
+- 로딩 플레이스홀더 단일 인스턴스, WPF 가상화 `Recycling` → `Standard`
+- 다중 선택 하이라이트 갱신 (`TreeMultiSelection.RefreshVisuals`)
+
+### 2.8.1 (2026-06-30) — 즐겨찾기 이동 멈춤 수정
+
+- `Index.TryGetFile` / `GGPK.Root.TryFindNode` 후 경로만 따라가기 (전체 트리 DFS 제거)
+- `GGPKDirectoryTreeItem` / `BundleDirectoryTreeItem` — `FindChildDirectory` / `FindChildFile`
+- 즐겨찾기 이동 루트→리프 순 펼침 (`FavoriteFileLocator.ExpandTo`)
+- `favorite.navigate` 진단 로그 (`DiagnosticLog.Measure`)
+
+---
 
 ### 2.8.0 (2026-06-30) — VisualGGPK3 대규모 UX/미리보기 패치
 
@@ -147,8 +184,10 @@
 
 ```
 MainWindow
-├── TreeFilterBar / FavoritesBar
-├── GGPKTree / BundleTree  → TreeViewFilter → FileSearchFilter + FileExcludeFilter + FileFormatFilter
+├── TreeFilterBar
+├── TreesLayout
+│   ├── FavoritesPanel (즐겨찾기 목록)
+│   └── MainLayout → GGPKTree / BundleTree → TreeViewFilter
 └── RightLayout.Panel2
     ├── TextPanel (텍스트)
     └── MediaPreviewPanel
@@ -162,9 +201,11 @@ MainWindow
 
 | 파일 | 내용 |
 |------|------|
-| `layout.txt` | `main`, `inner`, `infoAutoHide`, `filterType`, `filterExclude` |
+| `layout.txt` | `main`, `inner`, `favorites`, `infoAutoHide`, `filterType`, `filterExclude` |
 | `last.txt` | 마지막 GGPK 경로 |
 | `favorites.txt` | 즐겨찾기 파일 경로 목록 |
+| `bink2.txt` | 수동 지정 `bink2w64.dll` 경로 |
+| `diagnostic.log` | 진단·성능·오류 로그 |
 
 ### 알려진 제한
 
@@ -183,7 +224,8 @@ MainWindow
 
 1. 이 문서의 **현재 버전** 확인
 2. `Examples/VisualGGPK3/` 및 `MainWindow.cs` 구조 파악
-3. `.cursor/rules/visualggpk3-workflow.mdc` — 빌드·실행 규칙
+3. `.cursor/rules/version-bump-mandatory.mdc` — **버전업 필수** (alwaysApply)
+4. `.cursor/rules/visualggpk3-workflow.mdc` — 빌드·실행
 
 작업 종료 시:
 
@@ -227,6 +269,11 @@ powershell -ExecutionPolicy Bypass -File build-run.ps1
 14. 영상 미리보기 (mp4)  
 15. BK2 재생 (`bink2w64.dll`)  
 16. **이 handoff 문서 + 버전업 지침** (본 문서)
+17. 즐겨찾기 콤보박스 멈춤 → 2.8.1 경로 조회 수정
+18. 트리 펼침/필터 겹침 → 2.8.2 `TreeRefresh`
+19. 즐겨찾기 왼쪽 목록 패널 → 2.8.3
+20. BK2 Daum/수동 DLL, KB/MB 표시 → 2.8.4
+21. README·버전업 강제 규칙 → 2.8.5
 
 ---
 

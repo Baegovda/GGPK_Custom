@@ -34,11 +34,13 @@ public sealed class MainWindow : Form {
 	private readonly GridView DatPanel = new();
 	private readonly TextBox PathBox = new() { ReadOnly = true, PlaceholderText = "No file opened" };
 	private readonly TreeFilterBar FilterBar = new();
-	private readonly FavoritesBar FavoritesBar = new();
+	private readonly FavoritesPanel FavoritesPanel = new();
 	private readonly Splitter MainLayout;
 	private readonly Splitter RightLayout;
+	private readonly Splitter TreesLayout;
 	private int preferredMainSplitter;
 	private int preferredInnerSplitter;
+	private int preferredFavoritesSplitter;
 
 	private string? imageName;
 	private ITreeItem? clickedItem;
@@ -69,7 +71,7 @@ public sealed class MainWindow : Form {
 #pragma warning restore CS0618
 			// Virtualizing
 			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
-			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Recycling);
+			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Standard);
 			// Fix expand binding
 			var setter = (System.Windows.Setter)etree.ItemContainerStyle.Setters[0];
 			((System.Windows.Data.Binding)setter.Value).Mode = System.Windows.Data.BindingMode.TwoWay; // From OneTime
@@ -91,6 +93,7 @@ public sealed class MainWindow : Form {
 		var layout = LayoutSettingsStore.Load();
 		preferredMainSplitter = layout.MainSplitter;
 		preferredInnerSplitter = layout.InnerSplitter;
+		preferredFavoritesSplitter = layout.FavoritesSplitter;
 
 		RightLayout = new Splitter {
 			Panel1 = BundleTree,
@@ -118,6 +121,19 @@ public sealed class MainWindow : Form {
 				preferredMainSplitter = MainLayout.Position;
 		};
 
+		TreesLayout = new Splitter {
+			Panel1 = FavoritesPanel,
+			Panel1MinimumSize = 120,
+			Panel2 = MainLayout,
+			Panel2MinimumSize = 200,
+			SplitterWidth = 4,
+			Position = preferredFavoritesSplitter
+		};
+		TreesLayout.PositionChangeCompleted += (_, _) => {
+			if (TreesLayout.Position > 0)
+				preferredFavoritesSplitter = TreesLayout.Position;
+		};
+
 		var loading = new TreeItemCollection() {
 			new TreeItem() { Text = "Loading . . ." }
 		};
@@ -135,7 +151,8 @@ public sealed class MainWindow : Form {
 			DiagnosticLog.Measure("filter", "apply_trees", ApplyTreeFilters);
 		};
 		FilterBar.ExportFilteredPngsRequested += (_, _) => _ = ExportFilteredImagesAsPngAsync();
-		FavoritesBar.FavoriteSelected += (_, path) => NavigateToFavorite(path);
+		FavoritesPanel.FavoriteSelected += (_, path) => NavigateToFavorite(path);
+		FavoritesPanel.FavoriteRemoveRequested += (_, path) => RemoveFavorite(path);
 
 		var topBar = new DynamicLayout { Padding = new Padding(5), Spacing = new Size(5, 5) };
 		topBar.BeginHorizontal();
@@ -143,13 +160,12 @@ public sealed class MainWindow : Form {
 		topBar.Add(PathBox, xscale: true);
 		topBar.EndHorizontal();
 		topBar.Add(FilterBar, xscale: true);
-		topBar.Add(FavoritesBar, xscale: true);
 
 		Content = new TableLayout {
 			Spacing = new Size(0, 0),
 			Rows = {
 				new TableRow(topBar),
-				new TableRow(MainLayout) { ScaleHeight = true }
+				new TableRow(TreesLayout) { ScaleHeight = true }
 			}
 		};
 
@@ -190,7 +206,8 @@ public sealed class MainWindow : Form {
 				preferredInnerSplitter,
 				PreviewPanel.InfoAutoHideEnabled,
 				FilterBar.SelectedTypeFilterKey,
-				FilterBar.SelectedExcludeFilterText));
+				FilterBar.SelectedExcludeFilterText,
+				preferredFavoritesSplitter));
 			DiagnosticLog.LogSessionEnd("window_closed");
 		};
 
@@ -375,7 +392,12 @@ public sealed class MainWindow : Form {
 			else
 				FavoriteFilesStore.Add(path);
 		}
-		FavoritesBar.RefreshList();
+		FavoritesPanel.RefreshList();
+	}
+
+	private void RemoveFavorite(string path) {
+		FavoriteFilesStore.Remove(path);
+		FavoritesPanel.RefreshList();
 	}
 
 	private void NavigateToFavorite(string path) {
@@ -385,7 +407,8 @@ public sealed class MainWindow : Form {
 		}
 		var ggpkRoot = GGPKTree.DataStore as GGPKDirectoryTreeItem;
 		var bundleRoot = BundleTree.DataStore as BundleDirectoryTreeItem;
-		var file = FavoriteFileLocator.Find(path, ggpkRoot, bundleRoot);
+		FileTreeItem? file = DiagnosticLog.Measure("favorite", "navigate", () =>
+			FavoriteFileLocator.Find(path, Index, Ggpk, ggpkRoot, bundleRoot));
 		if (file is null) {
 			MessageBox.Show(this, $"File not found in the current archive:\r\n{path}", "Favorites", MessageBoxType.Warning);
 			return;
@@ -398,11 +421,6 @@ public sealed class MainWindow : Form {
 		}
 		var tree = file is GGPKFileTreeItem ? GGPKTree : BundleTree;
 		FavoriteFileLocator.ExpandTo(file);
-#if Windows
-		for (var node = file.Parent; node is not null; node = node.Parent)
-			RefreshDirectoryItem(tree, node);
-		tree.RefreshItem(file);
-#endif
 		tree.SelectedItem = file;
 		TreeMultiSelection.Get(tree)?.SelectSingle(file);
 	}
@@ -508,46 +526,8 @@ public sealed class MainWindow : Form {
 	}
 
 	private void ApplyTreeFilters() {
-		RefreshFormatFilterTree(GGPKTree);
-		RefreshFormatFilterTree(BundleTree);
-	}
-
-	private static void RefreshFormatFilterTree(TreeView tree) {
-		if (tree.DataStore is not DirectoryTreeItem root)
-			return;
-#pragma warning disable CS0618
-		var selected = tree.SelectedItem;
-#pragma warning restore CS0618
-		var multiSelected = TreeMultiSelection.Get(tree)?.Selected.ToArray();
-		InvalidateFilterCacheDeep(root);
-		RefreshDirectoryItem(tree, root);
-#pragma warning disable CS0618
-		if (selected is not null)
-			tree.SelectedItem = selected;
-#pragma warning restore CS0618
-		if (multiSelected is { Length: > 0 })
-			TreeMultiSelection.Get(tree)?.RestoreSelection(multiSelected);
-	}
-
-	private static void InvalidateFilterCacheDeep(DirectoryTreeItem dir) {
-		dir.InvalidateFilterCache();
-		if (!dir.Initialized)
-			return;
-		foreach (var child in dir.EnumerateAllChildren()) {
-			if (child is DirectoryTreeItem sub)
-				InvalidateFilterCacheDeep(sub);
-		}
-	}
-
-	private static void RefreshDirectoryItem(TreeView tree, DirectoryTreeItem dir) {
-		tree.RefreshItem(dir);
-		if (!dir.Initialized || !dir.Expanded)
-			return;
-		foreach (var child in dir.ChildItems) {
-			tree.RefreshItem(child);
-			if (child is DirectoryTreeItem sub)
-				RefreshDirectoryItem(tree, sub);
-		}
+		TreeRefresh.ApplyFilterChange(GGPKTree);
+		TreeRefresh.ApplyFilterChange(BundleTree);
 	}
 
 	private void OnSelectionChanged(object? sender, EventArgs _) {
@@ -972,8 +952,8 @@ public sealed class MainWindow : Form {
 
 	private static string FormatByteSize(long bytes) => bytes switch {
 		< 1024 => $"{bytes} bytes",
-		< 1024 * 1024 => $"{bytes / 1024.0:F1} KiB ({bytes:N0} bytes)",
-		_ => $"{bytes / (1024.0 * 1024):F2} MiB ({bytes:N0} bytes)"
+		< 1024 * 1024 => $"{bytes / 1024.0:F1} KB ({bytes:N0} bytes)",
+		_ => $"{bytes / (1024.0 * 1024):F2} MB ({bytes:N0} bytes)"
 	};
 
 #if Windows

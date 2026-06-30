@@ -56,11 +56,15 @@ internal sealed class VideoPlayerView : Panel {
 	};
 	private readonly Button playPauseButton = new() { Text = "Play", Width = 72 };
 	private readonly Button stopButton = new() { Text = "Stop", Width = 72, Enabled = false };
+	private readonly Button locateBinkButton = new() { Text = "Locate bink2w64.dll…", Visible = false };
 	private readonly UITimer positionTimer;
 	private readonly StackLayout volumeRow;
 	private bool seekDragging;
 	private bool binkMode;
 	private string? playbackError;
+	private string? pendingFileName;
+	private string? pendingPath;
+	private ReadOnlyMemory<byte> pendingData;
 
 	public VideoPlayerView() {
 		BackgroundColor = new Color(0.06f, 0.06f, 0.08f);
@@ -77,6 +81,7 @@ internal sealed class VideoPlayerView : Panel {
 
 		playPauseButton.Click += (_, _) => TogglePlayPauseCore();
 		stopButton.Click += (_, _) => Stop();
+		locateBinkButton.Click += (_, _) => OnLocateBinkDllClicked();
 		seekSlider.ValueChanged += (_, _) => OnSeekSliderChanged();
 		seekSlider.MouseDown += (_, _) => seekDragging = true;
 		seekSlider.MouseUp += (_, _) => {
@@ -126,6 +131,7 @@ internal sealed class VideoPlayerView : Panel {
 		controlsLayout.AddRow(titleLabel);
 		controlsLayout.AddRow(pathLabel);
 		controlsLayout.AddRow(transportRow);
+		controlsLayout.AddRow(locateBinkButton);
 		controlsLayout.AddRow(volumeRow);
 		controlsLayout.AddRow(detailsLabel);
 
@@ -141,6 +147,9 @@ internal sealed class VideoPlayerView : Panel {
 
 	public void SetVideo(string fileName, string path, string details, ReadOnlyMemory<byte> data) {
 		playbackError = null;
+		pendingFileName = fileName;
+		pendingPath = path;
+		pendingData = data;
 		UnloadCore();
 		binkMode = fileName.EndsWith(".bk2", StringComparison.OrdinalIgnoreCase);
 		if (binkMode) {
@@ -170,6 +179,7 @@ internal sealed class VideoPlayerView : Panel {
 		UpdateTimeLabels();
 		UpdateSeekSlider();
 		UpdateTransportButtons();
+		UpdateLocateBinkButton();
 	}
 
 	public void Unload() {
@@ -187,6 +197,7 @@ internal sealed class VideoPlayerView : Panel {
 		videoView.Visible = true;
 		binkFrameView.Visible = false;
 		volumeRow.Visible = true;
+		locateBinkButton.Visible = false;
 		UpdateTransportButtons();
 	}
 
@@ -346,6 +357,29 @@ internal sealed class VideoPlayerView : Panel {
 			return;
 		UpdateSeekSlider();
 		UpdateTimeLabels();
+	}
+
+	private void UpdateLocateBinkButton() =>
+		locateBinkButton.Visible = binkMode && !binkPlayback.CanPlay;
+
+	private void OnLocateBinkDllClicked() {
+		using var ofd = new OpenFileDialog {
+			FileName = "bink2w64.dll",
+			Filters = {
+				new FileFilter("Bink 2 decoder", "bink2w64.dll", ".dll"),
+				new FileFilter("All files", "*")
+			}
+		};
+		var parent = ParentWindow ?? Application.Instance.MainForm;
+		if (ofd.ShowDialog(parent) != DialogResult.Ok)
+			return;
+		try {
+			Bink2Locator.SetCustomPath(ofd.FileName);
+			if (pendingFileName is not null)
+				SetVideo(pendingFileName, pendingPath ?? "", Bink2Playback.Describe(pendingFileName, pendingData), pendingData);
+		} catch (Exception ex) {
+			MessageBox.Show(parent, ex.Message, "Bink 2 decoder", MessageBoxType.Error);
+		}
 	}
 
 	private void ShowPlaybackError(string message) {

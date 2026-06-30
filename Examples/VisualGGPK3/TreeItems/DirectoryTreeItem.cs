@@ -38,10 +38,14 @@ public abstract class DirectoryTreeItem : ITreeItem {
 
 	public virtual bool Initialized { get; protected internal set; }
 
+	private TreeItem? loadingPlaceholder;
+
 	public virtual ITreeItem this[int index] {
 		get {
-			if (!Initialized)
-				return new TreeItem { Text = "Loading . . .", Parent = this };
+			if (!Initialized) {
+				loadingPlaceholder ??= new TreeItem { Text = "Loading . . .", Parent = this };
+				return loadingPlaceholder;
+			}
 			var items = ChildItems;
 			if ((uint)index >= (uint)items.Count) {
 				if (items.Count == 0)
@@ -59,14 +63,20 @@ public abstract class DirectoryTreeItem : ITreeItem {
 	public virtual bool Expanded {
 		get => _Expanded;
 		set {
+			if (_Expanded == value)
+				return;
 			_Expanded = value;
-			if (value && !Initialized) {
+			if (value && !Initialized)
 				Initialized = true;
-#if !Windows
-				Tree.RefreshItem(this);
-#endif
-			}
+			Tree.RefreshItem(this);
 		}
+	}
+
+	/// <summary>Collapse when a filter leaves no visible children (no extra refresh).</summary>
+	internal void CollapseIfEmptyFiltered() {
+		if (!Initialized || !_Expanded || ChildItems.Count > 0)
+			return;
+		_Expanded = false;
 	}
 
 	string IListItem.Key => Name + "/";

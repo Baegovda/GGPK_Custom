@@ -393,8 +393,8 @@ internal sealed class MediaPreviewPanel : Panel {
 
 	private static string FormatByteSize(long bytes) => bytes switch {
 		< 1024 => $"{bytes} bytes",
-		< 1024 * 1024 => $"{bytes / 1024.0:F1} KiB ({bytes:N0} bytes)",
-		_ => $"{bytes / (1024.0 * 1024):F2} MiB ({bytes:N0} bytes)"
+		< 1024 * 1024 => $"{bytes / 1024.0:F1} KB ({bytes:N0} bytes)",
+		_ => $"{bytes / (1024.0 * 1024):F2} MB ({bytes:N0} bytes)"
 	};
 
 	private void PersistInfoAutoHideSetting() {

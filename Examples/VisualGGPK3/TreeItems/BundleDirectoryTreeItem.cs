@@ -77,18 +77,40 @@ public class BundleDirectoryTreeItem : DirectoryTreeItem, IDirectoryNode {
 	}
 
 	internal FileTreeItem? FindFileByPath(string path) {
+		path = FavoritePaths.Normalize(path);
+		var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		if (segments.Length == 0)
+			return null;
+		var dir = this;
+		for (var i = 0; i < segments.Length - 1; i++) {
+			var childDir = dir.FindChildDirectory(segments[i]);
+			if (childDir is null)
+				return null;
+			childDir.Expanded = true;
+			dir = childDir;
+		}
+		dir.Expanded = true;
+		return dir.FindChildFile(segments[^1]);
+	}
+
+	internal BundleDirectoryTreeItem? FindChildDirectory(string name) {
 		if (!Initialized)
 			Expanded = true;
 		if (!Initialized)
 			return null;
 		foreach (var node in Children) {
-			if (node is BundleFileTreeItem file && FavoritePaths.Equals(file.GetPath(), path))
+			if (node is BundleDirectoryTreeItem dir && string.Equals(dir.Name, name, StringComparison.OrdinalIgnoreCase))
+				return dir;
+		}
+		return null;
+	}
+
+	internal FileTreeItem? FindChildFile(string name) {
+		if (!Initialized)
+			return null;
+		foreach (var node in Children) {
+			if (node is BundleFileTreeItem file && string.Equals(file.Name, name, StringComparison.OrdinalIgnoreCase))
 				return file;
-			if (node is BundleDirectoryTreeItem dir) {
-				var found = dir.FindFileByPath(path);
-				if (found is not null)
-					return found;
-			}
 		}
 		return null;
 	}
