@@ -28,8 +28,8 @@ internal static class AppTheme {
 	public static readonly Color AccentHover = Color.FromRgb(0x6f9df5);
 	public static readonly Color AccentPressed = Color.FromRgb(0x4a7ad4);
 
-	public static readonly Color SelectionPrimary = Color.FromRgb(0x3d6cb9);
-	public static readonly Color SelectionSecondary = Color.FromRgb(0x2d4f88);
+	public static readonly Color SelectionPrimary = Color.FromRgb(0x355892);
+	public static readonly Color SelectionSecondary = Color.FromRgb(0x2a426a);
 
 	public static readonly Color DangerMuted = Color.FromRgb(0x8a4a4a);
 

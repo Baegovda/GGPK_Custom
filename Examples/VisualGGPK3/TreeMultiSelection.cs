@@ -406,8 +406,10 @@ internal sealed class TreeMultiSelection {
 			var item = GetTreeItem(tvi);
 			if (item is not null && ContainsSelected(item)) {
 				tvi.Background = TreeItemIdentity.Same(item, primary) ? PrimaryBrush : SecondaryBrush;
+				tvi.Foreground = WpfDarkTheme.PrimaryTextBrush;
 			} else {
 				tvi.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
+				tvi.ClearValue(System.Windows.Controls.Control.ForegroundProperty);
 			}
 		}
 	}

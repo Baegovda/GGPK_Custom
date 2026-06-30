@@ -39,12 +39,13 @@ internal static class WpfDarkTheme {
 	private static readonly WpfBrush Accent = Freeze(Solid(0x5b, 0x8d, 0xef));
 	private static readonly WpfBrush AccentHover = Freeze(Solid(0x6f, 0x9d, 0xf5));
 	private static readonly WpfBrush AccentPressed = Freeze(Solid(0x4a, 0x7a, 0xd4));
-	private static readonly WpfBrush SelectionPrimary = Freeze(Solid(0x3d, 0x6c, 0xb9));
-	private static readonly WpfBrush SelectionSecondary = Freeze(Solid(0x2d, 0x4f, 0x88));
+	private static readonly WpfBrush SelectionPrimary = Freeze(Solid(0x35, 0x58, 0x92));
+	private static readonly WpfBrush SelectionSecondary = Freeze(Solid(0x2a, 0x42, 0x6a));
 	private static readonly HashSet<IntPtr> HookedWindows = [];
 
 	public static WpfBrush PrimarySelectionBrush => SelectionPrimary;
 	public static WpfBrush SecondarySelectionBrush => SelectionSecondary;
+	public static WpfBrush PrimaryTextBrush => TextPrimary;
 
 	public static void Initialize() {
 		if (System.Windows.Application.Current is null)
@@ -54,6 +55,10 @@ internal static class WpfDarkTheme {
 		resources[SystemColors.WindowTextBrushKey] = TextPrimary;
 		resources[SystemColors.ControlBrushKey] = Surface;
 		resources[SystemColors.ControlTextBrushKey] = TextPrimary;
+		resources[SystemColors.HighlightBrushKey] = SelectionPrimary;
+		resources[SystemColors.HighlightTextBrushKey] = TextPrimary;
+		resources[SystemColors.InactiveSelectionHighlightBrushKey] = SelectionSecondary;
+		resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = TextPrimary;
 
 		// Eto creates the native WPF Window after the Form ctor; hook every form here.
 		Eto.Style.Add<FormHandler>(null, handler => {
@@ -237,6 +242,16 @@ internal static class WpfDarkTheme {
 		style.Setters.Add(new Setter(TreeViewItem.IsExpandedProperty,
 			new Binding("Expanded") { Mode = BindingMode.TwoWay }));
 		style.Setters.Add(new Setter(TreeViewItem.TemplateProperty, CreateTreeViewItemTemplate()));
+		var selectedTrigger = new Trigger { Property = TreeViewItem.IsSelectedProperty, Value = true };
+		selectedTrigger.Setters.Add(new Setter(TreeViewItem.BackgroundProperty, SelectionPrimary));
+		selectedTrigger.Setters.Add(new Setter(TreeViewItem.ForegroundProperty, TextPrimary));
+		style.Triggers.Add(selectedTrigger);
+		var inactiveSelected = new MultiTrigger();
+		inactiveSelected.Conditions.Add(new Condition(TreeViewItem.IsSelectedProperty, true));
+		inactiveSelected.Conditions.Add(new Condition(TreeViewItem.IsSelectionActiveProperty, false));
+		inactiveSelected.Setters.Add(new Setter(TreeViewItem.BackgroundProperty, SelectionSecondary));
+		inactiveSelected.Setters.Add(new Setter(TreeViewItem.ForegroundProperty, TextPrimary));
+		style.Triggers.Add(inactiveSelected);
 		return style;
 	}
 
@@ -250,11 +265,17 @@ internal static class WpfDarkTheme {
 			      <RowDefinition Height='Auto'/>
 			      <RowDefinition/>
 			    </Grid.RowDefinitions>
-			    <Grid.ColumnDefinitions>
-			      <ColumnDefinition Width='Auto'/>
-			      <ColumnDefinition Width='*'/>
-			    </Grid.ColumnDefinitions>
-			    <ToggleButton x:Name='Expander' Grid.Row='0' Grid.Column='0'
+			    <Border x:Name='ItemBg' Grid.Row='0' Grid.ColumnSpan='2'
+			            Background='{TemplateBinding Background}'
+			            BorderBrush='{TemplateBinding BorderBrush}'
+			            BorderThickness='{TemplateBinding BorderThickness}'
+			            CornerRadius='3' Padding='1,1,4,1' SnapsToDevicePixels='True'>
+			      <Grid>
+			        <Grid.ColumnDefinitions>
+			          <ColumnDefinition Width='Auto'/>
+			          <ColumnDefinition Width='*'/>
+			        </Grid.ColumnDefinitions>
+			    <ToggleButton x:Name='Expander' Grid.Column='0'
 			                  Width='16' Height='16' Margin='0,0,2,0' Padding='0'
 			                  ClickMode='Press' Focusable='False'
 			                  Background='Transparent' BorderThickness='0'
@@ -272,8 +293,11 @@ internal static class WpfDarkTheme {
 			      <Path x:Name='Chevron' Data='M 2 1 L 6 5 L 2 9' Stroke='#a8a8b8' StrokeThickness='1.4'
 			            HorizontalAlignment='Center' VerticalAlignment='Center'/>
 			    </ToggleButton>
-			    <ContentPresenter x:Name='PART_Header' Grid.Row='0' Grid.Column='1'
-			                      ContentSource='Header' VerticalAlignment='Center'/>
+			    <ContentPresenter x:Name='PART_Header' Grid.Column='1'
+			                      ContentSource='Header' VerticalAlignment='Center'
+			                      TextElement.Foreground='{TemplateBinding Foreground}'/>
+			      </Grid>
+			    </Border>
 			    <ItemsPresenter x:Name='ItemsHost' Grid.Row='1' Grid.Column='0' Grid.ColumnSpan='2'
 			                    Margin='16,0,0,0'/>
 			  </Grid>

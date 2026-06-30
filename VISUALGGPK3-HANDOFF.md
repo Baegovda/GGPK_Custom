@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.9.31` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.31)` |
+| **솔루션 / 어셈블리** | `2.9.32` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.32)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -53,6 +53,11 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.32 (2026-06-30) — 트리 선택 색
+
+- WPF `HighlightBrush` 다크 테마 오버라이드, TreeViewItem `TemplateBinding` 배경
+- 선택색 `#355892` / 다중선택 `#2a426a`, 글자 `#ececf0`
 
 ### 2.9.31 (2026-06-30) — 트리 점 잔상
 
