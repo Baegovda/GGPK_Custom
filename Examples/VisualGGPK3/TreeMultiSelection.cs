@@ -13,17 +13,20 @@ internal sealed class TreeMultiSelection {
 	private const double DragThreshold = 4;
 
 	private static readonly ConditionalWeakTable<TreeView, TreeMultiSelection> instances = new();
+	private static readonly HashSet<TreeMultiSelection> AllInstances = new();
 
 	private readonly TreeView etoTree;
 	private readonly HashSet<ITreeItem> selected = new(PathItemComparer.Instance);
 	private ITreeItem? anchor;
 	private ITreeItem? primary;
 	private bool internalChange;
+	private List<ITreeItem>? marqueePreviewHits;
 
 #if Windows
 	private readonly System.Windows.Controls.TreeView wpfTree;
 	private static readonly System.Windows.Media.Brush PrimaryBrush = WpfDarkTheme.PrimarySelectionBrush;
 	private static readonly System.Windows.Media.Brush SecondaryBrush = WpfDarkTheme.SecondarySelectionBrush;
+	private static readonly System.Windows.Media.Brush PreviewBrush = CreatePreviewBrush();
 	private System.Windows.Point dragStartPoint;
 	private ITreeItem? dragAnchorItem;
 	private bool dragSelectActive;
@@ -35,6 +38,7 @@ internal sealed class TreeMultiSelection {
 
 	private TreeMultiSelection(TreeView etoTree) {
 		this.etoTree = etoTree;
+		AllInstances.Add(this);
 #if Windows
 		wpfTree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)etoTree.Handler).Control;
 		wpfTree.PreviewMouseLeftButtonDown += OnPreviewMouseLeftButtonDown;
@@ -64,9 +68,11 @@ internal sealed class TreeMultiSelection {
 	public ITreeItem? Primary => primary;
 
 	public void SelectSingle(ITreeItem item) {
+		ClearPeerSelections();
 		selected.Clear();
 		selected.Add(item);
 		anchor = item;
+		marqueePreviewHits = null;
 		SetPrimary(item, notifyEto: true);
 		ApplyVisuals();
 	}
@@ -121,8 +127,12 @@ internal sealed class TreeMultiSelection {
 
 		var known = FindSelected(item);
 		if (known is not null) {
-			primary = known;
-			ApplyVisuals();
+			if (selected.Count > 1)
+				SelectSingle(item);
+			else {
+				primary = known;
+				ApplyVisuals();
+			}
 			return;
 		}
 
@@ -143,7 +153,6 @@ internal sealed class TreeMultiSelection {
 		marqueeActive = false;
 
 		var item = GetItemAt(wpfTree, dragStartPoint);
-		dragAnchorItem = item;
 		var mods = System.Windows.Input.Keyboard.Modifiers;
 		var ctrl = mods.HasFlag(System.Windows.Input.ModifierKeys.Control);
 		var shift = mods.HasFlag(System.Windows.Input.ModifierKeys.Shift);
@@ -155,6 +164,8 @@ internal sealed class TreeMultiSelection {
 			e.Handled = true;
 			return;
 		}
+
+		dragAnchorItem = shift ? item : null;
 
 		if (ctrl && !shift) {
 			Toggle(item);
@@ -194,6 +205,8 @@ internal sealed class TreeMultiSelection {
 
 		if (dragAnchorItem is null || anchor is null)
 			return;
+		if (!System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift))
+			return;
 
 		if (!dragSelectActive) {
 			if (Math.Abs(pos.X - dragStartPoint.X) < DragThreshold && Math.Abs(pos.Y - dragStartPoint.Y) < DragThreshold)
@@ -231,16 +244,27 @@ internal sealed class TreeMultiSelection {
 	}
 
 	private void FinishMarqueeSelection() {
+		marqueePreviewHits = null;
 		EndMarquee();
 		marqueeActive = false;
 		marqueePending = false;
 		if (wpfTree.IsMouseCaptured)
 			wpfTree.ReleaseMouseCapture();
+		ApplyVisuals();
+	}
+
+	private void ClearPeerSelections() {
+		foreach (var other in AllInstances) {
+			if (ReferenceEquals(other, this) || other.selected.Count == 0)
+				continue;
+			other.ClearSelection();
+		}
 	}
 
 	private void ClearSelection() {
 		selected.Clear();
 		anchor = null;
+		marqueePreviewHits = null;
 		SetPrimary(null, notifyEto: true);
 		ApplyVisuals();
 	}
@@ -267,7 +291,16 @@ internal sealed class TreeMultiSelection {
 		return null;
 	}
 
-	private void UpdateMarquee(System.Windows.Point end) => marqueeAdorner?.Update(end);
+	private void UpdateMarquee(System.Windows.Point end) {
+		marqueeAdorner?.Update(end);
+		var rect = CreateRect(dragStartPoint, end);
+		if (rect.Width < DragThreshold && rect.Height < DragThreshold) {
+			marqueePreviewHits = null;
+		} else {
+			marqueePreviewHits = CollectItemsInRect(rect);
+		}
+		ApplyVisuals();
+	}
 
 	private void EndMarquee() {
 		if (marqueeAdorner is null)
@@ -290,6 +323,22 @@ internal sealed class TreeMultiSelection {
 		if (rect.Width < DragThreshold && rect.Height < DragThreshold)
 			return;
 
+		var hits = CollectItemsInRect(rect);
+		if (hits.Count == 0)
+			return;
+
+		if (!additive) {
+			ClearPeerSelections();
+			selected.Clear();
+		}
+		foreach (var item in hits)
+			selected.Add(item);
+		anchor = hits[^1];
+		SetPrimary(hits[^1], notifyEto: true);
+		ApplyVisuals();
+	}
+
+	private List<ITreeItem> CollectItemsInRect(System.Windows.Rect rect) {
 		var hits = new List<ITreeItem>();
 		foreach (var tvi in EnumerateTreeViewItems(wpfTree)) {
 			if (!tvi.IsVisible || tvi.ActualHeight <= 0)
@@ -303,16 +352,7 @@ internal sealed class TreeMultiSelection {
 			if (rect.IntersectsWith(bounds))
 				hits.Add(item);
 		}
-		if (hits.Count == 0)
-			return;
-
-		if (!additive)
-			selected.Clear();
-		foreach (var item in hits)
-			selected.Add(item);
-		anchor = hits[^1];
-		SetPrimary(hits[^1], notifyEto: true);
-		ApplyVisuals();
+		return hits;
 	}
 
 	private static System.Windows.Rect GetTreeViewItemBounds(System.Windows.Controls.TreeViewItem tvi) {
@@ -343,6 +383,8 @@ internal sealed class TreeMultiSelection {
 	}
 
 	private void Toggle(ITreeItem item) {
+		if (!ContainsSelected(item))
+			ClearPeerSelections();
 		ITreeItem? removed = null;
 		foreach (var selectedItem in selected.ToList()) {
 			if (!TreeItemIdentity.Same(selectedItem, item))
@@ -374,8 +416,10 @@ internal sealed class TreeMultiSelection {
 		if (start > end)
 			(start, end) = (end, start);
 
-		if (!additive)
+		if (!additive) {
+			ClearPeerSelections();
 			selected.Clear();
+		}
 		for (var i = start; i <= end; i++)
 			selected.Add(visible[i]);
 		anchor = from;
@@ -404,14 +448,36 @@ internal sealed class TreeMultiSelection {
 	private void ApplyVisuals() {
 		foreach (var tvi in EnumerateTreeViewItems(wpfTree)) {
 			var item = GetTreeItem(tvi);
-			if (item is not null && ContainsSelected(item)) {
-				tvi.Background = TreeItemIdentity.Same(item, primary) ? PrimaryBrush : SecondaryBrush;
+			if (item is null)
+				continue;
+
+			var isPrimary = primary is not null && TreeItemIdentity.Same(item, primary);
+			var isSelected = ContainsSelected(item);
+			var isPreview = !isSelected && marqueePreviewHits is not null
+				&& marqueePreviewHits.Any(hit => TreeItemIdentity.Same(hit, item));
+
+			if (isSelected) {
+				tvi.Background = isPrimary ? PrimaryBrush : SecondaryBrush;
 				tvi.Foreground = WpfDarkTheme.PrimaryTextBrush;
+				tvi.IsSelected = isPrimary;
+			} else if (isPreview) {
+				tvi.Background = PreviewBrush;
+				tvi.Foreground = WpfDarkTheme.PrimaryTextBrush;
+				tvi.IsSelected = false;
 			} else {
+				tvi.IsSelected = false;
 				tvi.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
 				tvi.ClearValue(System.Windows.Controls.Control.ForegroundProperty);
 			}
 		}
+	}
+
+	private static System.Windows.Media.Brush CreatePreviewBrush() {
+		var brush = new System.Windows.Media.SolidColorBrush(
+			System.Windows.Media.Color.FromArgb(72, 91, 141, 239));
+		if (brush.CanFreeze)
+			brush.Freeze();
+		return brush;
 	}
 
 	private static IEnumerable<System.Windows.Controls.TreeViewItem> EnumerateTreeViewItems(System.Windows.Controls.ItemsControl parent) {

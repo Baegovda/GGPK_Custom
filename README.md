@@ -1,4 +1,4 @@
-![VisualGGPK3](https://img.shields.io/badge/VisualGGPK3-2.9.32-blue)
+![VisualGGPK3](https://img.shields.io/badge/VisualGGPK3-2.9.33-blue)
 ![LibGGPK3 upstream](https://img.shields.io/badge/upstream-LibGGPK3%202.7.5-lightgrey)
 [![Releases](https://img.shields.io/github/v/release/Baegovda/GGPK_Custom?label=release)](https://github.com/Baegovda/GGPK_Custom/releases)
 

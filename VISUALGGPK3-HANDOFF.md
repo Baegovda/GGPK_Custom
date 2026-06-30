@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.9.32` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.32)` |
+| **솔루션 / 어셈블리** | `2.9.33` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.33)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -53,6 +53,11 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.33 (2026-06-30) — 트리 선택 동작
+
+- 단일 클릭=단일 선택, Ctrl=토글, Shift=범위, Shift+드래그=범위 확장
+- 마퀴 드래그 시 항목 미리보기, `IsSelected` 잔상 제거, 트리 간 선택 초기화
 
 ### 2.9.32 (2026-06-30) — 트리 선택 색
 
