@@ -71,12 +71,8 @@ public sealed class MainWindow : Form {
 		static void WindowsFix(TreeView tree) {
 			var etree = ((Eto.Wpf.Forms.Controls.TreeViewHandler)tree.Handler).Control; // EtoTreeView
 #pragma warning restore CS0618
-			// Virtualizing
 			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.IsVirtualizingProperty, true);
 			etree.SetValue(System.Windows.Controls.VirtualizingStackPanel.VirtualizationModeProperty, System.Windows.Controls.VirtualizationMode.Standard);
-			// Fix expand binding
-			var setter = (System.Windows.Setter)etree.ItemContainerStyle.Setters[0];
-			((System.Windows.Data.Binding)setter.Value).Mode = System.Windows.Data.BindingMode.TwoWay; // From OneTime
 		}
 		WindowsFix(GGPKTree);
 		WindowsFix(BundleTree);

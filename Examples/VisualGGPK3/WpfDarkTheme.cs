@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -221,6 +221,73 @@ internal static class WpfDarkTheme {
 		tv.Foreground = TextPrimary;
 		tv.BorderBrush = Border;
 		tv.BorderThickness = new Thickness(1);
+		tv.SnapsToDevicePixels = true;
+		tv.UseLayoutRounding = true;
+		tv.SetValue(RenderOptions.ClearTypeHintProperty, ClearTypeHint.Enabled);
+		tv.ItemContainerStyle = CreateTreeViewItemStyle();
+	}
+
+	private static Style CreateTreeViewItemStyle() {
+		var style = new Style(typeof(TreeViewItem));
+		style.Setters.Add(new Setter(TreeViewItem.ForegroundProperty, TextPrimary));
+		style.Setters.Add(new Setter(TreeViewItem.BackgroundProperty, Brushes.Transparent));
+		style.Setters.Add(new Setter(TreeViewItem.BorderThicknessProperty, new Thickness(0)));
+		style.Setters.Add(new Setter(TreeViewItem.PaddingProperty, new Thickness(2, 1, 4, 1)));
+		style.Setters.Add(new Setter(TreeViewItem.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
+		style.Setters.Add(new Setter(TreeViewItem.IsExpandedProperty,
+			new Binding("Expanded") { Mode = BindingMode.TwoWay }));
+		style.Setters.Add(new Setter(TreeViewItem.TemplateProperty, CreateTreeViewItemTemplate()));
+		return style;
+	}
+
+	private static ControlTemplate CreateTreeViewItemTemplate() {
+		const string xaml = """
+			<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+			                 xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+			                 TargetType='{x:Type TreeViewItem}'>
+			  <Grid SnapsToDevicePixels='True'>
+			    <Grid.RowDefinitions>
+			      <RowDefinition Height='Auto'/>
+			      <RowDefinition/>
+			    </Grid.RowDefinitions>
+			    <Grid.ColumnDefinitions>
+			      <ColumnDefinition Width='Auto'/>
+			      <ColumnDefinition Width='*'/>
+			    </Grid.ColumnDefinitions>
+			    <ToggleButton x:Name='Expander' Grid.Row='0' Grid.Column='0'
+			                  Width='16' Height='16' Margin='0,0,2,0' Padding='0'
+			                  ClickMode='Press' Focusable='False'
+			                  Background='Transparent' BorderThickness='0'
+			                  IsChecked='{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}'>
+			      <ToggleButton.Style>
+			        <Style TargetType='ToggleButton'>
+			          <Setter Property='Visibility' Value='Collapsed'/>
+			          <Style.Triggers>
+			            <DataTrigger Binding='{Binding HasItems, RelativeSource={RelativeSource AncestorType=TreeViewItem}}' Value='True'>
+			              <Setter Property='Visibility' Value='Visible'/>
+			            </DataTrigger>
+			          </Style.Triggers>
+			        </Style>
+			      </ToggleButton.Style>
+			      <Path x:Name='Chevron' Data='M 2 1 L 6 5 L 2 9' Stroke='#a8a8b8' StrokeThickness='1.4'
+			            HorizontalAlignment='Center' VerticalAlignment='Center'/>
+			    </ToggleButton>
+			    <ContentPresenter x:Name='PART_Header' Grid.Row='0' Grid.Column='1'
+			                      ContentSource='Header' VerticalAlignment='Center'/>
+			    <ItemsPresenter x:Name='ItemsHost' Grid.Row='1' Grid.Column='0' Grid.ColumnSpan='2'
+			                    Margin='16,0,0,0'/>
+			  </Grid>
+			  <ControlTemplate.Triggers>
+			    <Trigger Property='IsExpanded' Value='False'>
+			      <Setter TargetName='ItemsHost' Property='Visibility' Value='Collapsed'/>
+			    </Trigger>
+			    <Trigger Property='HasItems' Value='False'>
+			      <Setter TargetName='PART_Header' Property='Margin' Value='18,0,0,0'/>
+			    </Trigger>
+			  </ControlTemplate.Triggers>
+			</ControlTemplate>
+			""";
+		return (ControlTemplate)XamlReader.Parse(xaml);
 	}
 
 	public static void StyleGridView(EtoGridView grid) {

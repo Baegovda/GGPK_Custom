@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.9.30` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.30)` |
+| **솔루션 / 어셈블리** | `2.9.31` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.9.31)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -53,6 +53,11 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.9.31 (2026-06-30) — 트리 점 잔상
+
+- `TreeMultiSelection` — 마퀴 Adorner 제거 후 Invalidate, 1px 미만 박스 미그리기
+- `WpfDarkTheme` — TreeViewItem 다크 템플릿(쉐브론만, 자식 없으면 확장 버튼 숨김)
 
 ### 2.9.30 (2026-06-30) — 미리보기 정보 오버레이
 

@@ -30,6 +30,7 @@ internal sealed class TreeMultiSelection {
 	private bool marqueePending;
 	private bool marqueeActive;
 	private TreeMarqueeAdorner? marqueeAdorner;
+	private System.Windows.Documents.AdornerLayer? marqueeLayer;
 #endif
 
 	private TreeMultiSelection(TreeView etoTree) {
@@ -245,11 +246,12 @@ internal sealed class TreeMultiSelection {
 	}
 
 	private bool BeginMarquee(System.Windows.Point start) {
-		var layer = FindAdornerLayer(wpfTree);
-		if (layer is null)
+		EndMarquee();
+		marqueeLayer = FindAdornerLayer(wpfTree);
+		if (marqueeLayer is null)
 			return false;
 		marqueeAdorner = new TreeMarqueeAdorner(wpfTree, start);
-		layer.Add(marqueeAdorner);
+		marqueeLayer.Add(marqueeAdorner);
 		wpfTree.CaptureMouse();
 		return true;
 	}
@@ -270,9 +272,18 @@ internal sealed class TreeMultiSelection {
 	private void EndMarquee() {
 		if (marqueeAdorner is null)
 			return;
-		var layer = FindAdornerLayer(wpfTree);
+		var layer = marqueeLayer ?? FindAdornerLayer(wpfTree);
 		layer?.Remove(marqueeAdorner);
 		marqueeAdorner = null;
+		marqueeLayer = null;
+		InvalidateTreeVisuals(layer);
+	}
+
+	private void InvalidateTreeVisuals(System.Windows.Documents.AdornerLayer? layer) {
+		layer?.InvalidateVisual();
+		wpfTree.InvalidateVisual();
+		wpfTree.InvalidateArrange();
+		wpfTree.UpdateLayout();
 	}
 
 	private void SelectItemsInRect(System.Windows.Rect rect, bool additive) {
@@ -416,9 +427,20 @@ internal sealed class TreeMultiSelection {
 	private sealed class TreeMarqueeAdorner : System.Windows.Documents.Adorner {
 		private readonly System.Windows.Point startPoint;
 		private System.Windows.Point endPoint;
+		private static readonly System.Windows.Media.Pen MarqueePen;
+		private static readonly System.Windows.Media.Brush MarqueeFill;
+
+		static TreeMarqueeAdorner() {
+			MarqueeFill = Freeze(new System.Windows.Media.SolidColorBrush(
+				System.Windows.Media.Color.FromArgb(40, 91, 141, 239)));
+			MarqueePen = Freeze(new System.Windows.Media.Pen(
+				Freeze(new System.Windows.Media.SolidColorBrush(
+					System.Windows.Media.Color.FromArgb(200, 91, 141, 239))), 1));
+		}
 
 		public TreeMarqueeAdorner(System.Windows.UIElement adornedElement, System.Windows.Point start)
 			: base(adornedElement) {
+			IsHitTestVisible = false;
 			startPoint = start;
 			endPoint = start;
 		}
@@ -430,9 +452,15 @@ internal sealed class TreeMultiSelection {
 
 		protected override void OnRender(System.Windows.Media.DrawingContext drawingContext) {
 			var rect = CreateRect(startPoint, endPoint);
-			var fill = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(40, 91, 141, 239));
-			var pen = new System.Windows.Media.Pen(new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(200, 91, 141, 239)), 1);
-			drawingContext.DrawRectangle(fill, pen, rect);
+			if (rect.Width < 1 && rect.Height < 1)
+				return;
+			drawingContext.DrawRectangle(MarqueeFill, MarqueePen, rect);
+		}
+
+		private static T Freeze<T>(T freezable) where T : System.Windows.Freezable {
+			if (freezable.CanFreeze)
+				freezable.Freeze();
+			return freezable;
 		}
 	}
 #else
