@@ -23,6 +23,8 @@ public sealed class ZoomableImageView : Panel {
 	private bool panning;
 	private Point panStartMouse;
 	private Point panStartScroll;
+	private Point panStartOffset;
+	private Point panOffset;
 
 	private const double ZoomStep = 1.15;
 	private const double MinZoom = 0.05;
@@ -59,6 +61,7 @@ public sealed class ZoomableImageView : Panel {
 		set {
 			sourceBitmap = value as Bitmap;
 			zoom = 1.0;
+			panOffset = Point.Empty;
 			scrollable.ScrollPosition = Point.Empty;
 			zoomBadge.Visible = sourceBitmap is not null;
 			UpdateZoomLabel();
@@ -74,20 +77,15 @@ public sealed class ZoomableImageView : Panel {
 			ResetZoom();
 			return;
 		}
-		if (e.Buttons != MouseButtons.Primary || !CanPan())
+		if (e.Buttons != MouseButtons.Primary || sourceBitmap is null)
 			return;
-		panning = true;
-		panStartMouse = ToScrollablePoint(sender as Control, e.Location);
-		panStartScroll = scrollable.ScrollPosition;
-		canvas.Cursor = Cursors.SizeAll;
+		BeginPan(ToScrollablePoint(sender as Control, e.Location));
 	}
 
 	private void OnPanMouseMove(object? sender, MouseEventArgs e) {
 		if (!panning)
 			return;
-		var current = ToScrollablePoint(sender as Control, e.Location);
-		var delta = current - panStartMouse;
-		SetScrollPosition(new Point(panStartScroll.X - delta.X, panStartScroll.Y - delta.Y));
+		ContinuePan(ToScrollablePoint(sender as Control, e.Location));
 	}
 
 	private void EndPan() {
@@ -100,9 +98,25 @@ public sealed class ZoomableImageView : Panel {
 		UpdatePanCursor();
 	}
 
-	private bool CanPan() {
-		if (sourceBitmap is null)
-			return false;
+	private void BeginPan(Point viewportMouse) {
+		panning = true;
+		panStartMouse = viewportMouse;
+		panStartScroll = scrollable.ScrollPosition;
+		panStartOffset = panOffset;
+		canvas.Cursor = Cursors.SizeAll;
+	}
+
+	private void ContinuePan(Point viewportMouse) {
+		var delta = viewportMouse - panStartMouse;
+		if (UsesScrollPan()) {
+			SetScrollPosition(new Point(panStartScroll.X - delta.X, panStartScroll.Y - delta.Y));
+			return;
+		}
+		panOffset = panStartOffset + delta;
+		canvas.Invalidate();
+	}
+
+	private bool UsesScrollPan() {
 		var client = scrollable.ClientSize;
 		var content = canvas.Size;
 		return content.Width > client.Width || content.Height > client.Height;
@@ -128,7 +142,7 @@ public sealed class ZoomableImageView : Panel {
 	private void UpdatePanCursor() {
 		if (panning)
 			return;
-		canvas.Cursor = CanPan() ? Cursors.Move : Cursors.Default;
+		canvas.Cursor = sourceBitmap is not null ? Cursors.Move : Cursors.Default;
 	}
 
 	private void OnPaint(object? sender, PaintEventArgs e) {
@@ -152,17 +166,31 @@ public sealed class ZoomableImageView : Panel {
 		if (Math.Abs(zoom - oldZoom) < 1e-9)
 			return;
 
-		var (_, oldOffset, oldImageSize) = GetCanvasLayout(oldZoom);
+		var (_, oldOffset, _) = GetCanvasLayout(oldZoom);
 		var scrollPos = scrollable.ScrollPosition;
-		var imageX = (scrollPos.X + viewport.X - oldOffset.X) / oldZoom;
-		var imageY = (scrollPos.Y + viewport.Y - oldOffset.Y) / oldZoom;
+		double imageX;
+		double imageY;
+		if (UsesScrollPan()) {
+			imageX = (scrollPos.X + viewport.X - oldOffset.X) / oldZoom;
+			imageY = (scrollPos.Y + viewport.Y - oldOffset.Y) / oldZoom;
+		} else {
+			imageX = (viewport.X - oldOffset.X) / oldZoom;
+			imageY = (viewport.Y - oldOffset.Y) / oldZoom;
+		}
 
 		ApplyZoom();
 
 		var (_, newOffset, _) = GetCanvasLayout();
-		SetScrollPosition(new Point(
-			(int)Math.Round(newOffset.X + imageX * zoom - viewport.X),
-			(int)Math.Round(newOffset.Y + imageY * zoom - viewport.Y)));
+		if (UsesScrollPan()) {
+			SetScrollPosition(new Point(
+				(int)Math.Round(newOffset.X + imageX * zoom - viewport.X),
+				(int)Math.Round(newOffset.Y + imageY * zoom - viewport.Y)));
+		} else {
+			panOffset = new Point(
+				(int)Math.Round(viewport.X - newOffset.X - imageX * zoom),
+				(int)Math.Round(viewport.Y - newOffset.Y - imageY * zoom));
+			canvas.Invalidate();
+		}
 	}
 
 	private PointF GetViewportCursor(Control? sender, MouseEventArgs e) {
@@ -183,10 +211,13 @@ public sealed class ZoomableImageView : Panel {
 		canvas.MinimumSize = canvasSize;
 		canvas.Invalidate();
 		scrollable.UpdateScrollSizes();
-		if (!CanPan())
-			scrollable.ScrollPosition = Point.Empty;
-		else
+		if (UsesScrollPan()) {
+			panOffset = Point.Empty;
 			SetScrollPosition(scrollable.ScrollPosition);
+		} else {
+			scrollable.ScrollPosition = Point.Empty;
+			canvas.Invalidate();
+		}
 		UpdateZoomLabel();
 		UpdatePanCursor();
 	}
@@ -210,16 +241,23 @@ public sealed class ZoomableImageView : Panel {
 		var clientHeight = client.Height > 0 ? client.Height : imageSize.Height;
 		var canvasWidth = Math.Max(imageSize.Width, clientWidth);
 		var canvasHeight = Math.Max(imageSize.Height, clientHeight);
+		var offset = new Point((canvasWidth - imageSize.Width) / 2, (canvasHeight - imageSize.Height) / 2);
+		if (!UsesScrollPanForLayout(canvasWidth, canvasHeight, client))
+			offset += panOffset;
 		return (
 			new Size(canvasWidth, canvasHeight),
-			new Point((canvasWidth - imageSize.Width) / 2, (canvasHeight - imageSize.Height) / 2),
+			offset,
 			imageSize);
 	}
+
+	private bool UsesScrollPanForLayout(int canvasWidth, int canvasHeight, Size client) =>
+		canvasWidth > client.Width || canvasHeight > client.Height;
 
 	private void ResetZoom() {
 		if (sourceBitmap is null)
 			return;
 		zoom = 1.0;
+		panOffset = Point.Empty;
 		scrollable.ScrollPosition = Point.Empty;
 		ApplyZoom();
 	}
@@ -255,13 +293,10 @@ public sealed class ZoomableImageView : Panel {
 			e.Handled = true;
 		};
 		wpfScrollHost.PreviewMouseLeftButtonDown += (_, e) => {
-			if (!CanPan())
+			if (sourceBitmap is null)
 				return;
-			panning = true;
 			var p = e.GetPosition(wpfScrollHost);
-			panStartMouse = new Point((int)p.X, (int)p.Y);
-			panStartScroll = scrollable.ScrollPosition;
-			canvas.Cursor = Cursors.SizeAll;
+			BeginPan(new Point((int)p.X, (int)p.Y));
 			wpfScrollHost.CaptureMouse();
 			e.Handled = true;
 		};
@@ -269,9 +304,7 @@ public sealed class ZoomableImageView : Panel {
 			if (!panning)
 				return;
 			var p = e.GetPosition(wpfScrollHost);
-			var current = new Point((int)p.X, (int)p.Y);
-			var delta = current - panStartMouse;
-			SetScrollPosition(new Point(panStartScroll.X - delta.X, panStartScroll.Y - delta.Y));
+			ContinuePan(new Point((int)p.X, (int)p.Y));
 			e.Handled = true;
 		};
 		wpfScrollHost.PreviewMouseLeftButtonUp += (_, e) => {

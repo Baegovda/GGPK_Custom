@@ -9,8 +9,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **솔루션 / 어셈블리** | `2.8.6` (`Directory.Build.props`) |
-| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.6)` |
+| **솔루션 / 어셈블리** | `2.8.7` (`Directory.Build.props`) |
+| **VisualGGPK3 창 제목** | `VisualGGPK3 (v2.8.7)` |
 | **마지막 정리일** | 2026-06-30 |
 | **GitHub 초기 커밋** | `2.8.0` (`9bdd6d8`) — 이후 `2.8.1`~`2.8.5`는 로컬 PATCH 누적 |
 
@@ -52,6 +52,11 @@
 ## 버전 이력
 
 > **2.8.0** = GitHub 초기 커밋. **공개 요약** → [`CHANGELOG.md`](CHANGELOG.md) · [Releases](https://github.com/Baegovda/GGPK_Custom/releases)
+
+### 2.8.7 (2026-06-30) — 이미지 드래그 이동
+
+- 스크롤바 없을 때도 좌클릭 드래그로 이미지 위치 이동 (`ZoomableImageView.panOffset`)
+- 확대 시 기존 스크롤 팬 동작 유지
 
 ### 2.8.6 (2026-06-30) — GitHub 변경 이력 연동
 

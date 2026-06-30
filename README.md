@@ -1,4 +1,4 @@
-![VisualGGPK3](https://img.shields.io/badge/VisualGGPK3-2.8.6-blue)
+![VisualGGPK3](https://img.shields.io/badge/VisualGGPK3-2.8.7-blue)
 ![LibGGPK3 upstream](https://img.shields.io/badge/upstream-LibGGPK3%202.7.5-lightgrey)
 [![Releases](https://img.shields.io/github/v/release/Baegovda/GGPK_Custom?label=release)](https://github.com/Baegovda/GGPK_Custom/releases)
 
@@ -27,7 +27,7 @@ Path of Exile `Content.ggpk` 및 번들 파일을 열고, 필터·미리보기·
 
 ## VisualGGPK3
 
-Eto.Forms + WPF 기반 GGPK/번들 뷰어. **2.8.6** 기준 주요 기능:
+Eto.Forms + WPF 기반 GGPK/번들 뷰어. **2.8.7** 기준 주요 기능:
 
 | 영역 | 기능 |
 |------|------|
